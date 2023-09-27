@@ -12,6 +12,7 @@
     <modules>
         <module>springboot-properties</module>
         <module>springboot-restapi</module>
+        <module>springboot-filter-interceptor</module>
     </modules>
 
 </project>
