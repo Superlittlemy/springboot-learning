@@ -1,6 +1,6 @@
-package com.slm.restapi.controller;
+package com.slm.properties.controller;
 
-import com.slm.restapi.config.Properties;
+import com.slm.properties.config.Properties;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.web.bind.annotation.GetMapping;

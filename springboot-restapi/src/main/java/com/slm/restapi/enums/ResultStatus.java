@@ -1,4 +1,4 @@
-package com.slm.enums;
+package com.slm.restapi.enums;
 
 import lombok.Getter;
 

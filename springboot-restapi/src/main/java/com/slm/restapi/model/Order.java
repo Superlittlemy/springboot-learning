@@ -1,4 +1,4 @@
-package com.slm.model;
+package com.slm.restapi.model;
 
 import lombok.Builder;
 import lombok.Data;

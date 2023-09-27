@@ -1,7 +1,7 @@
-package com.slm.controller;
+package com.slm.restapi.controller;
 
-import com.slm.model.ApiResponse;
-import com.slm.model.Order;
+import com.slm.restapi.model.ApiResponse;
+import com.slm.restapi.model.Order;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;

@@ -1,6 +1,6 @@
-package com.slm.model;
+package com.slm.restapi.model;
 
-import com.slm.enums.ResultStatus;
+import com.slm.restapi.enums.ResultStatus;
 import lombok.Data;
 
 /**
