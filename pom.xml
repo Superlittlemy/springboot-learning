@@ -13,6 +13,7 @@
         <module>springboot-properties</module>
         <module>springboot-restapi</module>
         <module>springboot-filter-interceptor</module>
+        <module>springboot-global-exception</module>
     </modules>
 
 </project>
