@@ -15,6 +15,7 @@
         <module>springboot-filter-interceptor</module>
         <module>springboot-global-exception</module>
         <module>springboot-validator</module>
+        <module>springboot-openapi</module>
     </modules>
 
 </project>
