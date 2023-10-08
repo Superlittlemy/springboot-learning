@@ -16,6 +16,7 @@
         <module>springboot-global-exception</module>
         <module>springboot-validator</module>
         <module>springboot-openapi</module>
+        <module>springboot-mybatis</module>
     </modules>
 
 </project>
