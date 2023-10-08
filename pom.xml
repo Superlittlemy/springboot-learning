@@ -17,6 +17,7 @@
         <module>springboot-validator</module>
         <module>springboot-openapi</module>
         <module>springboot-mybatis</module>
+        <module>springboot-hikari</module>
     </modules>
 
 </project>
