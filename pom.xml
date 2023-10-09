@@ -18,6 +18,7 @@
         <module>springboot-openapi</module>
         <module>springboot-mybatis</module>
         <module>springboot-hikari</module>
+        <module>springboot-redis-cache</module>
     </modules>
 
 </project>
