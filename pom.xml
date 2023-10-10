@@ -19,6 +19,7 @@
         <module>springboot-mybatis</module>
         <module>springboot-hikari</module>
         <module>springboot-redis-cache</module>
+        <module>springboot-event</module>
     </modules>
 
 </project>
