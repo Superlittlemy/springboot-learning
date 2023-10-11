@@ -20,6 +20,7 @@
         <module>springboot-hikari</module>
         <module>springboot-redis-cache</module>
         <module>springboot-event</module>
+        <module>springboot-kafka</module>
     </modules>
 
 </project>

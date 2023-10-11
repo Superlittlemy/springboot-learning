@@ -1,0 +1,4 @@
+spring:
+  kafka:
+    # kafka服务地址
+    bootstrap-servers: localhost:9092
