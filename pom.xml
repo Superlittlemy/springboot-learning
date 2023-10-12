@@ -22,6 +22,7 @@
         <module>springboot-event</module>
         <module>springboot-kafka</module>
         <module>springboot-email</module>
+        <module>springboot-minio</module>
     </modules>
 
 </project>

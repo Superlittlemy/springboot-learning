@@ -14,3 +14,4 @@
 - Spring Boot Event 事件发布与监听
 - Spring Boot 集成 Kafka
 - Spring Boot Email 邮件服务
+- Spring Boot Minio 对象存储
