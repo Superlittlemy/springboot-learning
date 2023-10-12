@@ -15,3 +15,4 @@
 - Spring Boot 集成 Kafka
 - Spring Boot Email 邮件服务
 - Spring Boot Minio 对象存储
+- Spring Boot Admin 监控
