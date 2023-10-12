@@ -21,6 +21,7 @@
         <module>springboot-redis-cache</module>
         <module>springboot-event</module>
         <module>springboot-kafka</module>
+        <module>springboot-email</module>
     </modules>
 
 </project>

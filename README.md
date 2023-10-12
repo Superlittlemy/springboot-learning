@@ -13,3 +13,4 @@
 - Spring Boot Redis 缓存
 - Spring Boot Event 事件发布与监听
 - Spring Boot 集成 Kafka
+- Spring Boot Email 邮件服务
