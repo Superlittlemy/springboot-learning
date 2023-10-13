@@ -24,6 +24,7 @@
         <module>springboot-email</module>
         <module>springboot-minio</module>
         <module>springboot-admin</module>
+        <module>springboot-task</module>
     </modules>
 
 </project>
