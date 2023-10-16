@@ -9,6 +9,7 @@
 - Spring Boot 参数校验
 - Spring Boot OpenAPI 文档集成
 - Spring Boot 集成 Mybatis
+- Spring Boot 集成 Mybatis-plus
 - Spring Boot Hikari 连接池详解
 - Spring Boot Redis 缓存
 - Spring Boot Event 事件发布与监听

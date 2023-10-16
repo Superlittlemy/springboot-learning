@@ -25,6 +25,7 @@
         <module>springboot-minio</module>
         <module>springboot-admin</module>
         <module>springboot-task</module>
+        <module>springboot-mybatis-plus</module>
     </modules>
 
 </project>
