@@ -8,9 +8,11 @@ import java.util.List;
 @Mapper
 public interface UserMapper {
 
+    Long count(String name);
+
     void add(User user);
 
-    List<User> query();
+    List<User> query(String name, int size, int start);
 
     void update(User user);
 

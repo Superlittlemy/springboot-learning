@@ -1,7 +1,9 @@
 package com.slm.mybatisplus.controller;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.slm.mybatisplus.entity.User;
 import com.slm.mybatisplus.model.ApiResponse;
+import com.slm.mybatisplus.model.PageRequest;
 import com.slm.mybatisplus.model.UserCreateRequest;
 import com.slm.mybatisplus.model.UserUpdateRequest;
 import com.slm.mybatisplus.service.UserService;
@@ -11,7 +13,6 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
-import java.util.List;
 
 @RestController
 @RequestMapping("/users")
@@ -23,8 +24,10 @@ public class UserController {
 
     @GetMapping
     @Operation(summary = "查询用户列表")
-    public ApiResponse<List<User>> query() {
-        return ApiResponse.ok(userService.list());
+    public ApiResponse<Page<User>> query(@RequestParam(required = false) String name,
+                                         @RequestParam(required = false) Boolean deleted,
+                                         PageRequest page) {
+        return ApiResponse.ok(userService.pageQuery(name, deleted, page));
     }
 
     @GetMapping("{id}")

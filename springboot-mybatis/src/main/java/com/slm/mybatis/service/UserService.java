@@ -2,6 +2,7 @@ package com.slm.mybatis.service;
 
 import com.slm.mybatis.entity.User;
 import com.slm.mybatis.mapper.UserMapper;
+import com.slm.mybatis.model.PageResult;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,8 +15,11 @@ public class UserService {
     @Autowired
     private UserMapper userMapper;
 
-    public List<User> query() {
-        return userMapper.query();
+    public PageResult<User> query(String name, int page, int size) {
+        int start = (page - 1) * size;
+        List<User> data = userMapper.query(name, size, start);
+        Long total = userMapper.count(name);
+        return PageResult.<User>builder().total(total).data(data).build();
     }
 
     @Transactional(rollbackFor = Exception.class)

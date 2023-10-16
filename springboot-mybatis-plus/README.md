@@ -40,3 +40,22 @@ public interface UserService extends IService<User> {}
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {}
 ```
 
+**分页实现**
+
+基于 BaseMapper.selectPage 实现面向对象的分页查询及过滤
+
+```javas
+@Mapper
+public interface UserMapper extends BaseMapper<User> {
+
+    default Page<User> selectPages(Page<User> page, String name, Boolean deleted) {
+        return this.selectPage(page,
+                Wrappers.<User>lambdaQuery()
+                        .and(StringUtils.isNotBlank(name), i -> i.like(User::getName, name))
+                        .and(Objects.nonNull(deleted), i -> i.eq(User::getDeleted, deleted))
+        );
+    }
+
+}
+```
+

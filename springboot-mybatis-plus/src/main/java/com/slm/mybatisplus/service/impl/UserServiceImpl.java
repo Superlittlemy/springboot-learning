@@ -1,9 +1,11 @@
 package com.slm.mybatisplus.service.impl;
 
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.slm.mybatisplus.entity.User;
 import com.slm.mybatisplus.exception.BizException;
 import com.slm.mybatisplus.mapper.UserMapper;
+import com.slm.mybatisplus.model.PageRequest;
 import com.slm.mybatisplus.model.UserCreateRequest;
 import com.slm.mybatisplus.model.UserUpdateRequest;
 import com.slm.mybatisplus.service.UserService;
@@ -13,6 +15,11 @@ import java.util.Objects;
 
 @Service
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements UserService {
+
+    @Override
+    public Page<User> pageQuery(String name, Boolean deleted, PageRequest page) {
+        return this.baseMapper.selectPages(new Page<>(page.getPage(), page.getSize()), name, deleted);
+    }
 
     @Override
     public Long save(UserCreateRequest request) {
