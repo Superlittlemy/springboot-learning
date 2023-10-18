@@ -18,3 +18,8 @@
 - Spring Boot Minio 对象存储
 - Spring Boot Admin 监控
 - Spring Boot Task 定时任务
+- Spring Boot Security 安全框架
+
+辅助功能
+
+- 热部署（spring-boot-devtools）
