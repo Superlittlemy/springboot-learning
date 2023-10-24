@@ -27,6 +27,7 @@
         <module>springboot-task</module>
         <module>springboot-mybatis-plus</module>
         <module>springboot-security</module>
+        <module>springboot-jpa</module>
     </modules>
 
 </project>
