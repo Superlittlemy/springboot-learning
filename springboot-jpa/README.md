@@ -88,4 +88,316 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 }
 ```
 
-继承 JpaRepository 接口实现了基本的 CURD 功能
+继承 JpaRepository 接口实现了基本的 CURD 功能！
+
+---
+
+### 主键生成策略
+
+JPA 使用 `@Id` 标注字段为主键，生成方式分为两种：一种是依据数据库特性生成，一种是依据代码逻辑生成，分别用到了以下两个注解：
+
+@GeneratedValue：设置主键的生成策略，依赖于具体的数据库
+
+属性：
+
+- strategy：指定 OpenJPA 容器自动生成实体标识的方式
+
+  | 值                      | 说明                       |
+  | ----------------------- | -------------------------- |
+  | GeneratorType.AUTO      | 主键由程序控制             |
+  | GenerationType.IDENTITY | 主键自增                   |
+  | GenerationType.SEQUENCE | 使用序列                   |
+  | GenerationType.TABLE    | 使用数据库某表字段作为主键 |
+
+  主流数据库支持情况
+
+  | 数据库     | 支持的策略                                                   |
+  | ---------- | ------------------------------------------------------------ |
+  | MySQL      | GeneratorType.AUTO<br />GenerationType.IDENTITY<br />GenerationType.TABLE<br />**不支持 GenerationType.SEQUENCE** |
+  | Oracle     | GeneratorType.AUTO<br />GenerationType.SEQUENCE<br />GenerationType.TABLE<br />**不支持 GenerationType.IDENTITY** |
+  | PostgreSQL | GeneratorType.AUTO<br />GenerationType.IDENTITY<br />GenerationType.SEQUENCE<br />GenerationType.TABLE<br />**均支持** |
+
+- generator：定义实体主键生成器的名称
+
+  需要配合 `@GenericGenerator` 使用，在 @GenericGenerator 中定义主键生成器名称及策略
+
+  示例：
+
+  ```java
+  @Id
+  @GenericGenerator(name = "jpa-uuid", strategy = "uuid")
+  @GeneratedValue(generator = "jpa-uuid")
+  private String id;
+  ```
+
+  在源码 org.hibernate.id.factory.internal.DefaultIdentifierGeneratorFactory 内定义了默认的几种策略
+
+  ```java
+  public DefaultIdentifierGeneratorFactory() {
+      register( "uuid2", UUIDGenerator.class );
+      register( "guid", GUIDGenerator.class );			// can be done with UUIDGenerator + strategy
+      register( "uuid", UUIDHexGenerator.class );			// "deprecated" for new use
+      register( "uuid.hex", UUIDHexGenerator.class ); 	// uuid.hex is deprecated
+      register( "assigned", Assigned.class );
+      register( "identity", IdentityGenerator.class );
+      register( "select", SelectGenerator.class );
+      register( "sequence", SequenceStyleGenerator.class );
+      register( "seqhilo", SequenceHiLoGenerator.class );
+      register( "increment", IncrementGenerator.class );
+      register( "foreign", ForeignGenerator.class );
+      register( "sequence-identity", SequenceIdentityGenerator.class );
+      register( "enhanced-sequence", SequenceStyleGenerator.class );
+      register( "enhanced-table", TableGenerator.class );
+  }
+  ```
+
+### **自定义主键生成策略**
+
+实现接口 org.hibernate.id.IdentifierGenerator
+
+```java
+public class MId implements IdentifierGenerator {
+
+    @Override
+    public Serializable generate(SharedSessionContractImplementor session, Object object) throws HibernateException {
+        return null;
+    }
+
+}
+```
+
+可以在这里通过分布式中间件，如 Redis 实现分布式唯一主键
+
+### 多对多关联关系
+
+@ManyToOne：通过 @JoinColumn 注明关联的外键字段
+
+```java
+public class Student {
+    @ManyToOne
+    @JoinColumn(name = "school_id")
+    private School school;
+}
+```
+
+@OneToMany
+
+方法一：双向关联，需要列表内对象内有该对象，通过 mappedBy 字段标识。CascadeType.PERSIST 表示在持久化的级联操作，也就是保存学校的时候可以一起保存学生，**而 CascadeType.ALL 带来的级联删除可能并不是你想要的**！
+
+```java
+public class School {
+    @OneToMany(mappedBy="school"，cascade = CascadeType.PERSIST)
+    private List<Student> students;
+}
+```
+
+方法二：中间表关联，借助 @JoinTable 标注中间表及互联字段
+
+```java
+ @JoinTable(name = "school_owned_students",
+            inverseJoinColumns = {@JoinColumn(name = "student_id", referencedColumnName = "id")},
+            joinColumns = {@JoinColumn(name = "school_id", referencedColumnName = "id")},
+            foreignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT), 
+            inverseForeignKey = @ForeignKey(ConstraintMode.NO_CONSTRAINT))
+private List<Student> students;
+```
+
+@OneToOne
+
+可添加注解后直接使用，如字段名特殊，可以添加 @JoinColumn 注明，参考 @ManyToOne 使用方法
+
+@ManyToMany
+
+多对多大多使用中间表实现，可以参考 @OneToMany 使用方法
+
+### 复杂查询 QueryDSL
+
+1）添加依赖，SpringBoot项目可以直接集成，无需配置版本
+
+```xml
+<!-- QueryDSL -->
+<dependency>
+    <groupId>com.querydsl</groupId>
+    <artifactId>querydsl-apt</artifactId>
+    <scope>provided</scope>
+</dependency>
+<dependency>
+    <groupId>com.querydsl</groupId>
+    <artifactId>querydsl-jpa</artifactId>
+</dependency>
+```
+
+2）Repository 继承 QuerydslPredicateExecutor<>
+
+```java
+@Repository
+public interface MerchandiseListViewRepository extends JpaRepository<MerchandiseListView, String>,QuerydslPredicateExecutor<MerchandiseListView> {
+}
+```
+
+父类的 `Page<T> findAll(Predicate predicate, Pageable pageable);` 可以实现类似 Jpa Specification 的复杂查询功能
+
+3）Predicate 生成
+
+方式一（简单集成）：
+
+Controller 层查询接口添加搜索条件，使用 `@QuerydslPredicate` 注解，属性 root 注明过滤的 Entity 是哪个
+
+```java
+@GetMapping
+@Operation(summary = "查询用户列表")
+public ApiResponse<Page<User>> query(@QuerydslPredicate(root = User.class) Predicate predicate,
+                                     Pageable pageable) {
+    return ApiResponse.ok(userService.pageQuery(predicate, pageable));
+}
+```
+
+Service 层直接调用 Repository 层的 `Page<T> findAll(Predicate predicate, Pageable pageable)` 即可
+
+自动适配的 Predicate 只支持精确查询，如果需要实现 like 查询需要自定义
+
+```java
+@Repository
+public interface UserRepository extends JpaRepository<User, Long>, QuerydslPredicateExecutor<User> {
+
+    @Override
+    default void customize(QuerydslBindings bindings, QUser qUser) {
+        bindings.bind(qUser.name).first(StringExpression::contains);
+        bindings.excluding(qMerchandiseListView.id);
+    }
+
+}
+```
+
+另外，QEntity 的对象较大，如果需要明确 DSL 覆盖的字段范围，可以通过限制不需要的过滤字段，添加自定义过滤来实现完整的自动化复杂查询。此处需要注意，屏蔽 DSL 查询字段的注解是 `@QueryType(PropertyType.NONE)` 而非字面的 `@QueryTransient`。
+
+```java
+@QueryType(PropertyType.NONE)
+@JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+private LocalDateTime createdDate;
+```
+
+方式二（复杂查询）：
+
+配置 JPAQueryFactory Bean
+
+```java
+@Configuration
+@RequiredArgsConstructor
+public class QueryDSLConfig {
+
+    @Bean
+    public JPAQueryFactory jpaQueryFactory(EntityManager entityManager) {
+        return new JPAQueryFactory(entityManager);
+    }
+
+}
+```
+
+通过 QEntity 生成更加面向对象的 DSL 复杂查询
+
+```java
+@Service
+@RequiredArgsConstructor
+public class MerchandiseServiceImpl implements MerchandiseService {
+
+    private final MerchandiseRepository merchandiseRepository;
+    private final MerchandiseListViewRepository merchandiseListViewRepository;
+    private final JPAQueryFactory jpaQueryFactory; // ADD
+
+    @Override
+    public Page<MerchandiseListView> list(Predicate predicate, Pageable pageable) {
+        QMerchandiseListView qm = QMerchandiseListView.merchandiseListView;
+        List<MerchandiseListView> data = jpaQueryFactory.selectFrom(qm).where(predicate).fetch();
+        long total = jpaQueryFactory.select(qm.id.count()).from(qm).where(predicate).fetchCount();
+        return new PageImpl<>(data, pageable, total);
+    }
+}
+```
+
+---
+
+### 各细节部分解决方案清单
+
+**清单1**：数据库默认值
+
+```java
+@Column(insertable = false)
+private Boolean deleted;
+```
+
+数据库该字段为非空，默认 false
+
+**清单2**：逻辑删除及自动过滤
+
+```java
+@Data
+@Entity
+@Where(clause = "deleted != 1")
+@SQLDelete(sql = "update user set deleted = 1 where id=?")
+@EntityListeners(AuditingEntityListener.class)
+public class User {
+}
+```
+
+- @Where：查询该对象时默认添加的过滤条件
+- @SQLDelete：替代 JPA 默认的 delete SQL 语句
+
+**清单3**：字段枚举
+
+```java
+@Data
+@Entity
+@EntityListeners(AuditingEntityListener.class)
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    @Enumerated(EnumType.STRING) // ADD
+    private Gender gender;
+
+}
+```
+
+需要添加依赖支持：
+
+```xml
+<dependency>
+    <groupId>com.vladmihalcea</groupId>
+    <artifactId>hibernate-types-55</artifactId>
+    <version>2.19.2</version>
+</dependency>
+```
+
+如果数据库类型为 PostgreSQL 还需要额外添加以下注解：
+
+```java
+@Data
+@Entity
+@EntityListeners(AuditingEntityListener.class)
+@TypeDef(name = "pgsql_enum", typeClass = PostgreSQLEnumType.class) // ADD
+public class User {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    @Type(type = "pgsql_enum") // ADD
+    @Enumerated(EnumType.STRING)
+    private Gender gender;
+
+}
+```
+
+**清单4**：默认值自动插入
+
+在类上添加注解 @DynamicInsert，可以在执行 insert 时将为 null 的字段排除。此方法可以解决数据库约束了字段非空时的 insert 语句错误问题。
+
+```java
+@Data
+@Entity
+@EntityListeners(AuditingEntityListener.class)
+@DynamicInsert
+public class User {
+}
+```

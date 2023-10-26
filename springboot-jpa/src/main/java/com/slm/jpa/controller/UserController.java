@@ -1,5 +1,6 @@
 package com.slm.jpa.controller;
 
+import com.querydsl.core.types.Predicate;
 import com.slm.jpa.entity.User;
 import com.slm.jpa.model.ApiResponse;
 import com.slm.jpa.model.UserCreateRequest;
@@ -10,6 +11,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.querydsl.binding.QuerydslPredicate;
 import org.springframework.web.bind.annotation.*;
 
 import javax.validation.Valid;
@@ -24,10 +26,9 @@ public class UserController {
 
     @GetMapping
     @Operation(summary = "查询用户列表")
-    public ApiResponse<Page<User>> query(@RequestParam(required = false) String name,
-                                         @RequestParam(required = false) Boolean deleted,
+    public ApiResponse<Page<User>> query(@QuerydslPredicate(root = User.class) Predicate predicate,
                                          Pageable pageable) {
-        return ApiResponse.ok(userService.pageQuery(name, deleted, pageable));
+        return ApiResponse.ok(userService.pageQuery(predicate, pageable));
     }
 
     @GetMapping("{id}")

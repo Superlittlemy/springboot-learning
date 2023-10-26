@@ -177,3 +177,12 @@ public class OrderController {
 }
 ```
 
+
+
+清单1：忽略 JSON 返回某字段
+
+```java
+@JsonIgnore
+private Boolean deleted;
+```
+

@@ -1,5 +1,6 @@
 package com.slm.jpa.service;
 
+import com.querydsl.core.types.Predicate;
 import com.slm.jpa.entity.User;
 import com.slm.jpa.model.UserCreateRequest;
 import com.slm.jpa.model.UserUpdateRequest;
@@ -10,7 +11,7 @@ public interface UserService {
 
     User get(Long id);
 
-    Page<User> pageQuery(String name, Boolean deleted, Pageable pageable);
+    Page<User> pageQuery(Predicate predicate, Pageable pageable);
 
     Long save(UserCreateRequest request);
 
