@@ -34,6 +34,12 @@ public class UserController {
         return ApiResponse.ok(userServiceImpl.get(id));
     }
 
+    @GetMapping("last")
+    @Operation(summary = "查询最近创建的用户名称")
+    public ApiResponse<String> lastCreatedUser() {
+        return ApiResponse.ok(userServiceImpl.lastCreatedUser());
+    }
+
     @PostMapping
     @Operation(summary = "新增用户")
     public ApiResponse<Long> createdUser(@RequestBody @Valid UserCreateRequest request) {

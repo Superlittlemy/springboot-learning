@@ -6,11 +6,186 @@ Spring Boot Redis 缓存
 
 **Redis** 是一款开源的 key-value 数据库，因其丰富的数据结构、超快的响应速度以及远超数据库的 OPS，让其成为缓存的热门选项。
 
-**Spring Cache** 是 Spring 提供的一套缓存解决方案，它不是具体的缓存实现，它只提供接口和代码规范、配置、注解等，用于整合各种缓存方案。
-
 ---
 
-**整合 Redis 缓存**
+**Redis 数据类型**
+
+1）字符串
+
+2）Hash（哈希）
+
+3）List（列表）
+
+4）Set（集合）
+
+5）ZSet（有序集合）
+
+## 基本命令
+
+选择数据库：select 0
+
+查询数据库中 key 的数量：dbsize
+
+### key 相关命令
+
+**语法：keys pattern**
+
+**说明：查找指定 key**
+
+pattern：查询条件
+
+| 模式     | 匹配key                             |
+| -------- | ----------------------------------- |
+| h?llo    | 匹配 hello, hallo 和 hxllo          |
+| h*llo    | 匹配 hllo 和 heeeello               |
+| h[ae]llo | 匹配 hello 和 hallo, 不匹配如 hillo |
+| `h[^e]llo` | 匹配 hallo, hbllo, ... 不匹配如 hello |
+| h[a-e]llo | 匹配 hallo 和 hbllo, [a-e]说明是a~e这个范围 ，如hcllo也可以匹配 |
+
+**语法：del key [key ……]**
+
+**说明：删除指定的 key**
+
+del name age address
+
+**语法：unlink key [key ……]**
+
+**说明：功能与 del 相同，会返回删除的键数量**
+
+unlink name1 name2 name3
+
+PS：del 与 unlink 的区别
+
+- del：是线程阻塞的
+
+- unlink：非线程阻塞的，删除任务会交由另外线程执行（效率比 del 高）
+
+**语法：exists key**
+
+**说明：查询键是否存在**
+
+exists name
+
+**语法：type key**
+
+**说明：返回指定 key 的类型**
+
+type name
+
+**语法：rename key newkey**
+
+**说明：修改 key 名称，如果 newkey 存在则用 key 的值覆盖**
+
+rename name name1
+
+PS：如果不想要重名了覆盖已有键，可以使用 renamenx 命令
+
+**语法：randomkey**
+
+**说明：随机返回一个key名称**
+
+**语法：expire key seconds [nx|xx|gt|lt]**
+
+**说明：为一个存在的key设置过期时间 秒**
+
+options：
+
+- NX：只有当key没有设置过期时间，才会执行命令（已经设置过的，不能再设置）
+- XX ：只有当key有过期时间，才会执行命令设置（没有设置过的，不能设置）
+- GT ：只有当新的过期时间大于当前过期时间时，才会设置（只会增加过期时间）
+- LT ：只有当新的过期时间大于当前过期时间时，才会设置（只会减少过期时间）
+
+PS：expire 过期时间单位为秒，需要使用毫秒可以使用 pexpire 命令
+
+**语法：expireat key timestamp [nx|xx|gt|lt]**
+
+**说明：为一个存在的 key 设置指定时间戳过期**
+
+PS：如果需要精确到毫秒，可以使用 pexpireat 命令
+
+**语法：persist key**
+
+**说明：清除过期时间，如果没有设置过期时间则返回 0**
+
+persist name
+
+**语法：ttl key**
+
+**说明：查看 key 的剩余时间，返回秒**
+
+ttl key
+
+PS：如果需要精确到毫秒，可以使用 pttl 命令
+
+**语法：move key db**
+
+**说明：移动指定 key 到目标数据库**
+
+move name 2
+
+### String 类型命令
+
+**语法：set key value [ex|px|exat|pxat|keepttl|nx|xx]**
+
+**说明：设置 string 类型的键值，如果 key 已存在则覆盖**
+
+options：
+
+- ex = expire：设置过期时间，单位秒
+
+- px = pexpire：设置过期时间，单位毫秒
+
+- exat = expireat：设置指定时间过期，秒级时间戳
+
+- oxat = pexpireat：设置指定时间过期，毫秒时间戳
+
+- keepttl：返回过期时间
+
+- nx：只有 key 不存在才会成功
+
+- xx：只有 key 存在才会成功
+
+**语法：append key value**
+
+**说明：用于为 key 追加值**
+
+append name ' good boy'
+
+**语法：getdel key**
+
+**说明：获取后删除指定 key**
+
+**语法：getset key**
+
+**说明：获取后更新指定 key**
+
+**语法：getrange key start end**
+
+**说明：获取指定范围内的值**
+
+set name zhangsan
+
+getrange name 2 5 -- 返回angs
+
+getrange name 3 -2 -- 返回ngsa
+
+负数代表从后往前数
+
+**语法：incr key**
+
+**说明：值累加1，非整形字符串会报错**
+
+**语法：incrby key increment**
+
+**说明：累加指定步长 increment**
+
+PS：累减使用 decr 关键字，需要步长参数就用 decrby 命令
+
+参考文档：https://www.cnblogs.com/antLaddie/p/15362191.html
+
+## 注解缓存集成
+
+**Spring Cache** 是 Spring 提供的一套缓存解决方案，它不是具体的缓存实现，它只提供接口和代码规范、配置、注解等，用于整合各种缓存方案。
 
 1. 添加依赖
 

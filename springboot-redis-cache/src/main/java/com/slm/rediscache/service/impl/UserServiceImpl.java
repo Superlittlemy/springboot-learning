@@ -5,6 +5,7 @@ import com.slm.rediscache.mapper.UserMapper;
 import com.slm.rediscache.model.UserCreateRequest;
 import com.slm.rediscache.model.UserUpdateRequest;
 import com.slm.rediscache.service.UserService;
+import com.slm.rediscache.utils.RedisUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
@@ -20,8 +21,8 @@ import java.util.Objects;
 public class UserServiceImpl implements UserService {
 
     private final static String REDIS_USER_INFO_KEY= "USER-INFO";
-
     private final UserMapper userMapper;
+    private final RedisUtil redisUtil;
 
     @Override
     public List<User> query() {
@@ -34,11 +35,16 @@ public class UserServiceImpl implements UserService {
         return userMapper.get(id);
     }
 
+    public String lastCreatedUser() {
+        return String.valueOf(redisUtil.get("lastCreatedUser"));
+    }
+
     @Override
     @CachePut(value = REDIS_USER_INFO_KEY, key = "#result.id", unless = "#result==null")
     @Transactional(rollbackFor = Exception.class)
     public User create(UserCreateRequest request) {
         User user = User.builder().name(request.getName()).build();
+        redisUtil.set("lastCreatedUser", request.getName());
         userMapper.add(user);
         return user;
     }
