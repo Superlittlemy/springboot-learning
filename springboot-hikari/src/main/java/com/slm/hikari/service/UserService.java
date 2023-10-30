@@ -2,17 +2,17 @@ package com.slm.hikari.service;
 
 import com.slm.hikari.entity.User;
 import com.slm.hikari.mapper.UserMapper;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class UserService {
 
-    @Autowired
-    private UserMapper userMapper;
+    private final UserMapper userMapper;
 
     public List<User> query() {
         return userMapper.query();

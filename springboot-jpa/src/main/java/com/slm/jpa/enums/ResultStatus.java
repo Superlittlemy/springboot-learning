@@ -8,9 +8,9 @@ import lombok.Getter;
 @Getter
 public enum ResultStatus {
 
-    SUCCESS(20000, "成功"),
+    SUCCESS(20000, "调用成功"),
     REJECT(30000, "请求拒绝"),
-    ERROR(50000, "失败");
+    ERROR(50000, "接口异常");
 
     private final int code;
     private final String message;

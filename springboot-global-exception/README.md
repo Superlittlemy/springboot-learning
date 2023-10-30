@@ -11,7 +11,7 @@ Spring Boot 全局异常处理
 public class MyExceptionHandler {
 
     @ExceptionHandler(Exception.class)
-    public ApiResponse handler(Exception e) {
+    public ApiResponse<String> handler(Exception e) {
         return ApiResponse.failure(ResultStatus.ERROR, e.getMessage());
     }
 
@@ -34,12 +34,12 @@ public class MyExceptionHandler {
 
 ```java
 @ExceptionHandler(Exception.class)
-public ApiResponse handler(Exception e) {
+public ApiResponse<String> handler(Exception e) {
     return ApiResponse.failure(ResultStatus.ERROR, e.getMessage());
 }
 
 @ExceptionHandler(Exception.class)
-public ApiResponse handler2(Exception e) {
+public ApiResponse<String> handler2(Exception e) {
     return ApiResponse.failure(ResultStatus.ERROR, e.getMessage());
 }
 ```
@@ -50,13 +50,13 @@ public ApiResponse handler2(Exception e) {
 
 ```java
 @ExceptionHandler(Exception.class)
-public ApiResponse handler(Exception e) {
+public ApiResponse<String> handler(Exception e) {
     return ApiResponse.failure(ResultStatus.ERROR, e.getMessage());
 }
 
 // IO 异常会直接命中这个处理方法
 @ExceptionHandler(IOException.class)
-public ApiResponse handler(IOException e) {
+public ApiResponse<String> handler(IOException e) {
     return ApiResponse.failure(ResultStatus.ERROR, e.getMessage());
 }
 ```

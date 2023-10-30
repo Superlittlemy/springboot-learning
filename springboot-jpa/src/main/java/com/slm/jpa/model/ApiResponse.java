@@ -1,19 +1,19 @@
 package com.slm.jpa.model;
 
 import com.slm.jpa.enums.ResultStatus;
-import lombok.Data;
+import lombok.Getter;
 
 /**
  * 统一返回对象
  *
  * @param <T>
  */
-@Data
+@Getter
 public class ApiResponse<T> {
 
-    private int code;
-    private String message;
-    private T data;
+    private final int code;
+    private final String message;
+    private final T data;
 
     public ApiResponse(int code, String message, T data) {
         this.code = code;

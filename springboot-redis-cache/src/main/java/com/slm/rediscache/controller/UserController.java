@@ -36,20 +36,20 @@ public class UserController {
 
     @PostMapping
     @Operation(summary = "新增用户")
-    public ApiResponse<Integer> createdUser(@RequestBody @Valid UserCreateRequest request) {
+    public ApiResponse<Long> createdUser(@RequestBody @Valid UserCreateRequest request) {
         return ApiResponse.ok(userServiceImpl.create(request).getId());
     }
 
     @PutMapping
     @Operation(summary = "修改用户信息")
-    public ApiResponse modifyUser(@RequestBody @Valid UserUpdateRequest request) {
+    public ApiResponse<?> modifyUser(@RequestBody @Valid UserUpdateRequest request) {
         userServiceImpl.modify(request);
         return ApiResponse.ok();
     }
 
     @DeleteMapping("{id}")
     @Operation(summary = "删除用户")
-    public ApiResponse deleteUser(@PathVariable Long id) {
+    public ApiResponse<?> deleteUser(@PathVariable Long id) {
         userServiceImpl.delete(id);
         return ApiResponse.ok();
     }

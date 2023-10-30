@@ -3,17 +3,17 @@ package com.slm.hikari.controller;
 import com.slm.hikari.entity.User;
 import com.slm.hikari.model.ApiResponse;
 import com.slm.hikari.service.UserService;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/users")
+@RequiredArgsConstructor
 public class UserController {
 
-    @Autowired
-    private UserService userService;
+    private final UserService userService;
 
     @GetMapping
     public ApiResponse<List<User>> query() {
@@ -21,12 +21,12 @@ public class UserController {
     }
 
     @PostMapping
-    public ApiResponse<Integer> createdUser(@RequestBody User user) {
+    public ApiResponse<Long> createdUser(@RequestBody User user) {
         return ApiResponse.ok(userService.create(user));
     }
 
     @PutMapping
-    public ApiResponse<Integer> modifyUser(@RequestBody User user) {
+    public ApiResponse<?> modifyUser(@RequestBody User user) {
         userService.modify(user);
         return ApiResponse.ok();
     }

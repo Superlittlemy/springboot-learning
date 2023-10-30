@@ -19,7 +19,7 @@ public class OrderController {
      * @return
      */
     @GetMapping("list")
-    public ApiResponse<Order> queryOrderList() {
+    public ApiResponse<List<Order>> queryOrderList() {
         return ApiResponse.ok(List.of(Order.builder().build()));
     }
 
@@ -41,7 +41,7 @@ public class OrderController {
      * @return
      */
     @PostMapping
-    public ApiResponse createOrder(Order order) {
+    public ApiResponse<?> createOrder(Order order) {
         // order data persistence
         return ApiResponse.ok();
     }
@@ -53,7 +53,7 @@ public class OrderController {
      * @return
      */
     @PutMapping
-    public ApiResponse updateOrder(Order order) {
+    public ApiResponse<?> updateOrder(Order order) {
         // order data update
         return ApiResponse.ok();
     }
@@ -65,7 +65,7 @@ public class OrderController {
      * @return
      */
     @DeleteMapping("{id}")
-    public ApiResponse deleteOrder(@PathVariable Integer id) {
+    public ApiResponse<?> deleteOrder(@PathVariable Integer id) {
         // order data delete
         return ApiResponse.ok();
     }

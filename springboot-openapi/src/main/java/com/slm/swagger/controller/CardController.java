@@ -28,19 +28,19 @@ public class CardController {
 
     @PostMapping
     @Operation(summary = "新建卡")
-    public ApiResponse createCard(@RequestBody Card card) {
+    public ApiResponse<?> createCard(@RequestBody Card card) {
         return ApiResponse.ok();
     }
 
     @PutMapping
     @Operation(summary = "修改卡")
-    public ApiResponse modifyCard(@RequestBody Card card) {
+    public ApiResponse<?> modifyCard(@RequestBody Card card) {
         return ApiResponse.ok();
     }
 
     @DeleteMapping
     @Operation(summary = "删除卡")
-    public ApiResponse deleteCard(@PathVariable Long id) {
+    public ApiResponse<?> deleteCard(@PathVariable Long id) {
         return ApiResponse.ok();
     }
 

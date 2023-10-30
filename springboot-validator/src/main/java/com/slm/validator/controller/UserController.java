@@ -14,7 +14,7 @@ import javax.validation.Valid;
 public class UserController {
 
     @PostMapping
-    public ApiResponse createUser(@RequestBody @Valid UserCreateModel user) {
+    public ApiResponse<?> createUser(@RequestBody @Valid UserCreateModel user) {
         return ApiResponse.ok();
     }
 

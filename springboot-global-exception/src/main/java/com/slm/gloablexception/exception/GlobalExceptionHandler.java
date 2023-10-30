@@ -8,9 +8,8 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class GlobalExceptionHandler {
 
-
     @ExceptionHandler(Exception.class)
-    public ApiResponse handler(Exception e) {
+    public ApiResponse<String> handler(Exception e) {
         return ApiResponse.failure(ResultStatus.ERROR, e.getMessage());
     }
 

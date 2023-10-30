@@ -3,17 +3,17 @@ package com.slm.mybatis.service;
 import com.slm.mybatis.entity.User;
 import com.slm.mybatis.mapper.UserMapper;
 import com.slm.mybatis.model.PageResult;
-import org.springframework.beans.factory.annotation.Autowired;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
 @Service
+@RequiredArgsConstructor
 public class UserService {
 
-    @Autowired
-    private UserMapper userMapper;
+    private final UserMapper userMapper;
 
     public PageResult<User> query(String name, int page, int size) {
         int start = (page - 1) * size;

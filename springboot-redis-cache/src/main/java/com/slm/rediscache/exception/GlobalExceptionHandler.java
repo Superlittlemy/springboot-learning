@@ -9,12 +9,12 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 public class GlobalExceptionHandler {
 
     @ExceptionHandler(BizException.class)
-    public ApiResponse handler(BizException e) {
+    public ApiResponse<String> handler(BizException e) {
         return ApiResponse.failure(ResultStatus.REJECT, e.getMessage());
     }
 
     @ExceptionHandler(Exception.class)
-    public ApiResponse handler(Exception e) {
+    public ApiResponse<String> handler(Exception e) {
         e.printStackTrace();
         return ApiResponse.failure(ResultStatus.ERROR, e.getMessage());
     }

@@ -13,18 +13,18 @@ public class GlobalExceptionHandler {
 
 
     @ExceptionHandler(Exception.class)
-    public ApiResponse handler(Exception e) {
+    public ApiResponse<String> handler(Exception e) {
         return ApiResponse.failure(ResultStatus.ERROR, e.getMessage());
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
-    public ApiResponse handler(MethodArgumentNotValidException e) {
+    public ApiResponse<String> handler(MethodArgumentNotValidException e) {
         BindingResult bindingResult = e.getBindingResult();
         StringBuilder sb = new StringBuilder("参数校验失败：");
         for (FieldError fieldError : bindingResult.getFieldErrors()) {
             sb.append(fieldError.getDefaultMessage()).append("(").append(fieldError.getField()).append(")，");
         }
-        return ApiResponse.failure(ResultStatus.ERROR, sb.deleteCharAt(sb.length() - 1));
+        return ApiResponse.failure(ResultStatus.ERROR, sb.deleteCharAt(sb.length() - 1).toString());
     }
 
 }

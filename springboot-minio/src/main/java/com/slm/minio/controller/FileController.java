@@ -20,7 +20,7 @@ public class FileController {
     }
 
     @GetMapping("{filename}")
-    public ApiResponse<?> getUrl(@PathVariable String filename) {
+    public ApiResponse<String> getUrl(@PathVariable String filename) {
         return ApiResponse.ok(fileStorageService.getUrl(filename));
     }
 

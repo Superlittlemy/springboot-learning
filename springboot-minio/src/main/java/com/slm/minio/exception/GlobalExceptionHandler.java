@@ -10,7 +10,7 @@ public class GlobalExceptionHandler {
 
 
     @ExceptionHandler(Exception.class)
-    public ApiResponse handler(Exception e) {
+    public ApiResponse<String> handler(Exception e) {
         e.printStackTrace();
         return ApiResponse.failure(ResultStatus.ERROR, e.getMessage());
     }

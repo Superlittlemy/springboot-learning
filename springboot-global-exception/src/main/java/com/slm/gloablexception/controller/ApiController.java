@@ -10,12 +10,12 @@ import org.springframework.web.bind.annotation.RestController;
 public class ApiController {
 
     @GetMapping("success")
-    public ApiResponse success() {
+    public ApiResponse<String> success() {
         return ApiResponse.ok("success");
     }
 
     @GetMapping("failure")
-    public ApiResponse failure() {
+    public ApiResponse<?> failure() {
         throw new RuntimeException("系统业务异常");
     }
 
