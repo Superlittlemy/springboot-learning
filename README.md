@@ -13,6 +13,7 @@
 - Spring Boot JPA - 全自动 ORM
 - Spring Boot Hikari 连接池详解
 - Spring Boot Redis 缓存
+- Spring Boot Redis 分布式锁
 - Spring Boot Event 事件发布与监听
 - Spring Boot 集成 Kafka
 - Spring Boot Email 邮件服务

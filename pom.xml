@@ -28,6 +28,7 @@
         <module>springboot-mybatis-plus</module>
         <module>springboot-security</module>
         <module>springboot-jpa</module>
+        <module>springboot-redis-lock</module>
     </modules>
 
 </project>
