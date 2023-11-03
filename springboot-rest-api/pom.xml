@@ -12,7 +12,7 @@
     </parent>
 
     <groupId>com.slm</groupId>
-    <artifactId>springboot-restapi</artifactId>
+    <artifactId>springboot-rest-api</artifactId>
 
     <properties>
         <maven.compiler.source>11</maven.compiler.source>

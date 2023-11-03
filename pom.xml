@@ -11,7 +11,7 @@
 
     <modules>
         <module>springboot-properties</module>
-        <module>springboot-restapi</module>
+        <module>springboot-rest-api</module>
         <module>springboot-filter-interceptor</module>
         <module>springboot-global-exception</module>
         <module>springboot-validator</module>
