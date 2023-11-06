@@ -29,6 +29,7 @@
         <module>springboot-security</module>
         <module>springboot-jpa</module>
         <module>springboot-redis-lock</module>
+        <module>springboot-rest-template</module>
     </modules>
 
 </project>

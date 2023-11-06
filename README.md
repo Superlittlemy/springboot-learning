@@ -21,6 +21,7 @@
 - Spring Boot Admin 监控
 - Spring Boot Task 定时任务
 - Spring Boot Security 安全框架
+- Spring Boot RestTemplate HTTP 请求
 
 辅助功能
 
