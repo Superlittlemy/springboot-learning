@@ -143,3 +143,50 @@ public class MinioUtil {
 5）文件上传
 
 ![](D:\workspace\practice-master\springboot-master\code\springboot-minio\Snipaste_2023-10-12_16-32-34.png)
+
+**添加文件元数据持久化**
+
+1）建立元数据对象
+
+```java
+@Entity
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
+public class FileMetadata {
+
+    @Id
+    @GenericGenerator(name = "jpa-uuid", strategy = "org.hibernate.id.UUIDGenerator")
+    @GeneratedValue(generator = "jpa-uuid")
+    private String id;
+    private String name;
+    private String suffix;
+    private String mime;
+    @Enumerated(EnumType.STRING)
+    private StorageType storageType; // MINIO
+    @CreatedDate
+    private LocalDateTime createdDate;
+
+}
+```
+
+2）解析文件 MIME 类型
+
+借助 Apache Tika 检测文件类型
+
+```xml
+<dependency>
+    <groupId>org.apache.tika</groupId>
+    <artifactId>tika-core</artifactId>
+    <version>2.8.0</version>
+</dependency>
+```
+
+示例：
+
+```java
+String mime = new Tika().detect(new FileInputStream(""))
+```
+

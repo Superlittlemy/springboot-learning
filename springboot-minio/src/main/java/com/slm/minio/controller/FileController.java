@@ -19,9 +19,8 @@ public class FileController {
     private final FileStorageService fileStorageService;
 
     @PostMapping
-    public ApiResponse<?> upload(@RequestParam MultipartFile file) {
-        fileStorageService.upload(file, file.getOriginalFilename());
-        return ApiResponse.ok();
+    public ApiResponse<String> upload(@RequestParam MultipartFile file) {
+        return ApiResponse.ok(fileStorageService.upload(file, file.getOriginalFilename()));
     }
 
     @GetMapping("/url/{filename}")

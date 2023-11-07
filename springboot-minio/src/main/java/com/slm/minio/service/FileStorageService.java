@@ -6,12 +6,12 @@ import java.io.InputStream;
 
 public interface FileStorageService {
 
-    void upload(MultipartFile file, String filename);
+    String upload(MultipartFile file, String filename);
 
-    void remove(String filename);
+    void remove(String id);
 
-    String getUrl(String filename);
+    String getUrl(String id);
 
-    InputStream getInputStream(String filename);
+    InputStream getInputStream(String id);
 
 }
