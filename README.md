@@ -12,6 +12,7 @@
 - Spring Boot 集成 Mybatis-plus
 - Spring Boot JPA - 全自动 ORM
 - Spring Boot Hikari 连接池详解
+- Spring Boot Caffeine 本地缓存
 - Spring Boot Redis 缓存
 - Spring Boot Redis 分布式锁
 - Spring Boot Event 事件发布与监听

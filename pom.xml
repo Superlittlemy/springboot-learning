@@ -30,6 +30,7 @@
         <module>springboot-jpa</module>
         <module>springboot-redis-lock</module>
         <module>springboot-rest-template</module>
+        <module>springboot-caffeine</module>
     </modules>
 
 </project>
