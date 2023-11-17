@@ -23,9 +23,9 @@ public class FileController {
         return ApiResponse.ok(fileStorageService.upload(file, file.getOriginalFilename()));
     }
 
-    @GetMapping("/url/{filename}")
-    public ApiResponse<String> getUrl(@PathVariable String filename) {
-        return ApiResponse.ok(fileStorageService.getUrl(filename));
+    @GetMapping("/url/{id}")
+    public ApiResponse<String> getUrl(@PathVariable String id) {
+        return ApiResponse.ok(fileStorageService.getUrl(id));
     }
 
     @GetMapping("/download/{filename}")

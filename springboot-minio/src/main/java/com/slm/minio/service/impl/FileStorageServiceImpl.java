@@ -24,7 +24,7 @@ public class FileStorageServiceImpl implements FileStorageService {
     private final FileMetadataRepository fileMetadataRepository;
 
     public String getOSSFilename(FileMetadata fileMetadata) {
-        return fileMetadata.getId().concat(".").concat(fileMetadata.getSuffix());
+        return fileMetadata.getId().concat(fileMetadata.getSuffix());
     }
 
     @Override
