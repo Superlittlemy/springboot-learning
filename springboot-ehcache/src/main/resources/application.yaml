@@ -1,0 +1,30 @@
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/bsp
+    username: root
+    password: 123456
+  jpa:
+    show-sql: true
+    properties:
+      hibernate:
+        cache:
+          # 开启查询缓存
+          use_query_cache: true
+          # 开启二级缓存
+          use_second_level_cache: true
+          # 缓存工厂
+          region:
+            factory_class: org.hibernate.cache.ehcache.EhCacheRegionFactory
+          # 忽略 ehcache 每个缓存对象都要配置的警告
+          ehcache:
+            missing_cache_strategy: create
+      # 缓存策略
+      # ENABLE_SELECTIVE：被@Cacheable显式声明要缓存
+      # DISABLE_SELECTIVE：被@Cacheable显式声明不缓存
+      # ALL：都支持缓存
+      # NONE：不缓存
+      javax:
+        persistence:
+          sharedCache:
+            mode: ENABLE_SELECTIVE

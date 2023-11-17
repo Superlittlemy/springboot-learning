@@ -11,6 +11,7 @@
 - Spring Boot 集成 Mybatis
 - Spring Boot 集成 Mybatis-plus
 - Spring Boot JPA - 全自动 ORM
+- Spring Boot JPA 二级缓存（ehcache）
 - Spring Boot Hikari 连接池详解
 - Spring Boot Caffeine 本地缓存
 - Spring Boot Redis 缓存
