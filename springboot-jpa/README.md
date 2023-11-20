@@ -315,6 +315,195 @@ public class MerchandiseServiceImpl implements MerchandiseService {
 }
 ```
 
+**PS：找不到QEntity 问题**
+
+添加 apt 编译插件解决
+
+```xml
+<build>
+    <plugins>
+        <plugin>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-maven-plugin</artifactId>
+        </plugin>
+        <plugin>
+            <groupId>com.mysema.maven</groupId>
+            <artifactId>apt-maven-plugin</artifactId>
+            <version>1.1.3</version>
+            <executions>
+                <execution>
+                    <goals>
+                        <goal>process</goal>
+                    </goals>
+                    <configuration>
+                        <outputDirectory>target</outputDirectory>
+                        <processor>com.querydsl.apt.jpa.JPAAnnotationProcessor</processor>
+                    </configuration>
+                </execution>
+            </executions>
+        </plugin>
+    </plugins>
+</build>
+```
+
+### 投影 Projections
+
+Spring Data 数据查询方法的返回通常的是 Repository 管理的聚合根的一个或多个实例。但是，有时候我们只需要返回某些特定的属性，不需要全部返回，或者只返回一些复合型的字段。Spring Data 允许我们对特定的返回类型建模，以便更有选择的检索托管聚合的部分视图。
+
+#### 基于接口的投影
+
+##### 闭合投影（Closed Projections）
+
+一个投影接口，其 get 方法都与实体类的属性相同，被认为是一个闭合投影。如果使用闭合投影 Spring Data 可以优化查询执行，因为我们知道支持投影代理所需要的所有属性，实际执行 SQL 查询的字段会被优化为接口内列明的字段。
+
+```java
+public interface UserVO {
+
+    String getName();
+    Gender getGender();
+    LocalDateTime getCreatedDate();
+
+}
+```
+
+##### 开放投影（Open Projections）
+
+投影接口中的 get 方法也可以使用 @Value 注释计算新值。
+
+```java
+public interface UserVO {
+
+    String getName();
+    Gender getGender();
+    @Value("#{target.gender.getDesc()}")
+    String getGenderName();
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    LocalDateTime getCreatedDate();
+
+}
+```
+
+支持嵌套投影，可以在投影接口内集成其他投影接口，字段会被识别到下层投影
+
+```java
+public interface GenderVO {
+
+    // 注意：此处 target 为根据嵌入的方法名称识别到的 gender 字段
+    @Value("#{target.name()}")
+    String getCode();
+    @Value("#{target.getDesc()}")
+    String getName();
+
+}
+public interface UserVO {
+
+    String getName();
+    GenderVO getGender();
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    LocalDateTime getCreatedDate();
+
+}
+```
+
+更加强大的映射功能
+
+方法一：基于 JAVA 8 的接口默认方法特性实现
+
+```java
+public interface UserVO {
+
+    String getName();
+    Gender getGender();
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    LocalDateTime getCreatedDate();
+
+    default String getGenderName() {
+        return getGender() == null ? null : getGender().getName();
+    }
+
+}
+```
+
+方法二：基于 Spring Bean 的方法实现（可以使用 Spring 管理的持久化和工具类等）
+
+```java
+public interface UserVO {
+
+    String getName();
+    Gender getGender();
+    @Value("#{XXXBean.getGenderName(target.gender)}")
+    String getGenderName();
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    LocalDateTime getCreatedDate();
+
+}
+@Component
+class XXXBean {
+
+	public String getGenderName(Gender gender) {
+		return gender == null ? null : gender.getName();
+	}
+
+}
+```
+
+#### 基于类的投影DTO
+
+定义投影的另一种方是使用值类型DTO（数据传输对象），该 DTO 持有需要检索的属性。DTO 投影的使用方式与接口投影完全相同，只是不会发生代理，也不能用嵌套投影。要加载的字段由公开的构造方法的参数名确定。使用 lombok 的 @Value 注解来简化 DTO 编写。
+
+```java
+import lombok.Value;
+
+@Value
+public class UserDTO {
+
+    String name;
+    Gender gender;
+    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
+    LocalDateTime createdDate;
+
+}
+```
+
+#### 动态投影
+
+Repository方法改造为如下：
+
+```java
+/**
+  *  动态返回投影，type可以是实体，接口投影，DTO投影
+  */
+<T> T findById(Long id, Class<T> type);
+```
+
+调用时，动态确定返回投影：
+
+```java
+@Test
+void findById(){
+    // 返回实体
+    User user = userRepository.findById(1, User.class);
+
+    System.out.println("===================");
+
+    // 返回接口投影
+    UserVO user2 = userRepository.findById(1, UserVO.class);
+
+    System.out.println("===================");
+
+    //返回DTO投影
+    UserDTO user3 = userRepository.findById(1, UserDTO.class);
+}
+```
+
+其余功能：
+
+- 支持分页排序
+- 支持 Optional 返回
+- 支持与 @Query 配置查询（**如果投影对象为 DTO，需要全限定名构造函数接收**）
+
+via https://www.cnblogs.com/caofanqi/p/11924299.html
+
 ---
 
 ### 各细节部分解决方案清单

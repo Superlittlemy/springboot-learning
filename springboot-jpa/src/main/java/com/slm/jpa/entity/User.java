@@ -34,9 +34,7 @@ public class User {
     private Gender gender;
     @CreatedDate
     @QueryType(PropertyType.NONE)
-    @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdDate;
-    @JsonIgnore
     @Column(insertable = false)
     private Boolean deleted;
 

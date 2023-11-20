@@ -4,12 +4,13 @@ import com.querydsl.core.types.Predicate;
 import com.slm.jpa.entity.User;
 import com.slm.jpa.model.UserCreateRequest;
 import com.slm.jpa.model.UserUpdateRequest;
+import com.slm.jpa.model.UserVO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 public interface UserService {
 
-    User get(Long id);
+    UserVO get(Long id);
 
     Page<User> pageQuery(Predicate predicate, Pageable pageable);
 

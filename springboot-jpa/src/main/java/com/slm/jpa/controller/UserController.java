@@ -5,6 +5,7 @@ import com.slm.jpa.entity.User;
 import com.slm.jpa.model.ApiResponse;
 import com.slm.jpa.model.UserCreateRequest;
 import com.slm.jpa.model.UserUpdateRequest;
+import com.slm.jpa.model.UserVO;
 import com.slm.jpa.service.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -33,7 +34,7 @@ public class UserController {
 
     @GetMapping("{id}")
     @Operation(summary = "查询用户信息")
-    public ApiResponse<User> getUserInfo(@PathVariable Long id) {
+    public ApiResponse<UserVO> getUserInfo(@PathVariable Long id) {
         return ApiResponse.ok(userService.get(id));
     }
 

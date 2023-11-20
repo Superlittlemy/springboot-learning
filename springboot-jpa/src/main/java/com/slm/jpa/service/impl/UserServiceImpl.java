@@ -5,6 +5,7 @@ import com.slm.jpa.entity.User;
 import com.slm.jpa.exception.BizException;
 import com.slm.jpa.model.UserCreateRequest;
 import com.slm.jpa.model.UserUpdateRequest;
+import com.slm.jpa.model.UserVO;
 import com.slm.jpa.repository.UserRepository;
 import com.slm.jpa.service.UserService;
 import lombok.RequiredArgsConstructor;
@@ -21,8 +22,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     @Transactional(readOnly = true)
-    public User get(Long id) {
-        return userRepository.findById(id).orElseThrow(() -> new BizException("用户不存在"));
+    public UserVO get(Long id) {
+        return userRepository.getById(id).orElseThrow(() -> new BizException("用户不存在"));
     }
 
     @Override
