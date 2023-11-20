@@ -14,6 +14,30 @@ JSR-303 是 JAVA EE 6 中的一项子规范，叫做 Bean Validation。但没有
 
 Hibernate Validator 是 Bean Validation 的参考实现。 Hibernate Validator 提供了 JSR 303 规范中所有内置 constraint 的实现，除此之外还有一些附加的 constraint。
 
+### 校验模式
+
+1. **普通模式**（默认是这个模式）：会校验完所有的属性，然后返回所有的验证失败信息
+2. **快速失败模式**：只要有一个验证失败，则返回
+
+通常在实际开发中，我们需要配置快速失败模式，配置方式如下：
+
+```java
+@Configuration
+public class ValidatorConfig {
+
+    @Bean
+    public Validator validator() {
+        ValidatorFactory validatorFactory = Validation.byProvider(HibernateValidator.class)
+                .configure()
+                // 快速失败模式
+                .failFast(true)
+                .buildValidatorFactory();
+        return validatorFactory.getValidator();
+    }
+
+}
+```
+
 ### 常用注解
 
 | 注解                                   | 说明                                                         |
@@ -93,6 +117,126 @@ public class UserController {
 
     @PostMapping
     public void createUser(@RequestBody @Valid UserCreateModel user) {
+    }
+
+}
+```
+
+### 分组校验
+
+为校验分组创建标识接口
+
+```java
+public interface UserCreate {
+}
+public interface UserModify {
+}
+```
+
+对校验字段标注接口分组
+
+```java
+@Data
+public class UserModel {
+
+    @NotBlank(message = "用户id不能为空", groups = { UserModify.class })
+    private String id;
+    @NotBlank(message = "姓名不能为空", groups = { UserCreate.class, UserModify.class })
+    private String name;
+    @Length(min = 18, message = "二代身份证必须为18位", groups = { UserCreate.class, UserModify.class })
+    private String idNo;
+
+}
+```
+
+控制层支持分组校验，由原先的 @Valid 变成 @Validated，并标注校验的分组
+
+```java
+@PostMapping
+public ApiResponse<?> createUser(@RequestBody @Validated(value = UserCreate.class) UserModel user) {
+    return ApiResponse.ok();
+}
+
+@PutMapping
+public ApiResponse<?> modifyUser(@RequestBody @Validated(value = UserModify.class) UserModel user) {
+    return ApiResponse.ok();
+}
+```
+
+### 自定义校验类
+
+创建自定义校验注解
+
+```java
+@Target({ElementType.FIELD, ElementType.PARAMETER})
+@Retention(RetentionPolicy.RUNTIME)
+@Constraint(validatedBy= MobileValidator.class)
+public @interface MobileCheck {
+
+    String message() default "手机号码格式错误";
+
+    Class<?>[] groups() default {};
+
+    Class<? extends Payload>[] payload() default {};
+}
+```
+
+创建校验器
+
+```java
+public class MobileValidator implements ConstraintValidator<MobileCheck, String> {
+
+    @Override
+    public boolean isValid(String value, ConstraintValidatorContext context) {
+        return StringUtils.isEmpty(value) || Pattern.matches("^1[3-9]\\d{9}$", value);
+    }
+
+}
+```
+
+给对应字段添加该注解以支持参数校验
+
+```java
+@MobileCheck()
+private String mobile;
+```
+
+### Service 层校验
+
+为 service bean 添加 @Validated 开启校验功能，为方法参数添加 @Valid 标注需要校验的类
+
+```java
+@Service
+@Validated
+public class UserService {
+
+    public void createUser(UserModel userModel) {
+
+    }
+
+    public void modifyUser(UserModel userModel) {
+        Address address = new Address();
+        address.setValue(userModel.getAddress());
+        Application.sa.getBean(this.getClass()).addressPersistence(address);
+    }
+
+    public void addressPersistence(@Valid Address address) {
+
+    }
+
+}
+```
+
+PS：service 内部调用的方法触发校验需要基于代理调用，此处采用启动类静态参数获取 Bean 实现，如下：
+
+```java
+@SpringBootApplication
+public class Application {
+
+    public static ConfigurableApplicationContext sa;
+
+    public static void main(String[] args) {
+        sa = SpringApplication.run(Application.class, args);
     }
 
 }
