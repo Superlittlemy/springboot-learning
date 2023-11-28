@@ -32,6 +32,7 @@
         <module>springboot-rest-template</module>
         <module>springboot-caffeine</module>
         <module>springboot-ehcache</module>
+        <module>springboot-easyexcel</module>
     </modules>
 
 </project>
