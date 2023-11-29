@@ -33,6 +33,7 @@
         <module>springboot-caffeine</module>
         <module>springboot-ehcache</module>
         <module>springboot-easyexcel</module>
+        <module>springboot-easypoi</module>
     </modules>
 
 </project>

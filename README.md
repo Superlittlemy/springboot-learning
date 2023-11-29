@@ -25,6 +25,7 @@
 - Spring Boot Security 安全框架
 - Spring Boot RestTemplate HTTP 请求
 - Spring Boot Excel - EasyExcel版
+- Spring Boot Excel - EasyPoi版
 
 辅助功能
 

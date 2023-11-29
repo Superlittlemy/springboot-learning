@@ -25,7 +25,7 @@ public class StudentService {
 
     @SneakyThrows
     public void importExcel(MultipartFile file) {
-        List<Student> read = ExcelUtil.read(file, Student.class);
+        List<Student> read = ExcelUtil.read(file.getInputStream(), Student.class);
         read.forEach(s -> {
             log.info(s.toString());
         });
