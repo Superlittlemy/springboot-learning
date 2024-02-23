@@ -28,3 +28,5 @@ spring:
         persistence:
           sharedCache:
             mode: ENABLE_SELECTIVE
+server:
+  port: 8900
