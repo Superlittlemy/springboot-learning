@@ -1,24 +1,26 @@
 package com.slm.security.controller;
 
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.web.bind.annotation.GetMapping;
+import com.slm.security.utils.JWTUtil;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/auth")
+@RequiredArgsConstructor
 public class AuthController {
 
-    @GetMapping("/current-user")
-    public String getUsername() {
-        Object principal = SecurityContextHolder.getContext().getAuthentication().getPrincipal();
-        if ("anonymousUser".equals(principal)) {
-            return null;
-        } else if (principal instanceof User) {
-            return ((User) principal).getUsername();
-        }
-        return null;
+    private final AuthenticationManager authenticationManager;
+
+    @RequestMapping("login")
+    public String login(String username, String password) {
+        UsernamePasswordAuthenticationToken authenticationToken =
+                new UsernamePasswordAuthenticationToken(username, password);
+        authenticationManager.authenticate(authenticationToken);
+        //上一步没有抛出异常说明认证成功，我们向用户颁发jwt令牌
+        return JWTUtil.generateJwtToken(username, password);
     }
 
 }

@@ -15,6 +15,8 @@ Spring Security 核心是通过自动装配组成过滤器链，逐步完成认�
 
 ![](.\14483918-baacf316904e06b7.webp)
 
+### 默认实现
+
 1）集成 Spring Security
 
 ```xml
@@ -24,7 +26,7 @@ Spring Security 核心是通过自动装配组成过滤器链，逐步完成认�
 </dependency>
 ```
 
-此时启动就算是集成了 Spring Security，日志里会生成一串密码，此时访问接口会跳转至自带的登录页面，默认账号user的密码就是日志里的那串长密码。
+此时启动就算是集成了 Spring Security，日志里会生成一串密码，此时访问接口会跳转至自带的登录页面，默认账号 user 的密码就是日志里的那串长密码。
 
 2）获取自定义用户密码
 
@@ -51,190 +53,213 @@ public class MyUserDetailsService implements UserDetailsService {
 }
 ```
 
-3）配置登录成功/失败处理器
+一个请求过来 Spring Security 会按照下图的步骤处理：
 
-实现抽象登录成功/失败处理接口
+![](D:\workspace\springboot-learning\springboot-security\asserts\v2-7836b6bc78e9b8316bba24696bd734a0_720w.png)
+
+- Filter：拦截Http请求，获取用户名和秘密等认证信息
+
+- AuthenticationManager：从 filter 中获取认证信息，然后查找合适的 AuthenticationProvider 来发起认证流程
+- AuthenticationProvider：调用UserDetailsService来查询已经保存的用户信息并与从http请求中获取的认证信息比对。如果成功则返回，否则则抛出异常
+- UserDetailsService：负责获取用户保存的认证信息，例如查询数据库
+
+这些组件都是抽象的，每个都可以有不同的实现，换句话说都是可以定制，特别灵活，所以就特别复杂。具体到我们这个默认的例子中，使用的都是默认实现：
+
+- Filter： UsernamePasswordAuthenticationFilter
+- AuthenticationManager： ProviderManager
+- AuthenticationProvider： DaoAuthenticationProvider
+- UserDetailsService： InMemoryUserDetailsManager
+
+### 使用 Token 认证方案
+
+#### JWT
+
+比较流行的就是使用 JWT（JSON Web Tokens），其是一个开放的工业标准。
+
+JWT 由一下三部分组成：Header、Payload 和 Signature
+
+![](D:\workspace\springboot-learning\springboot-security\asserts\13587608-4b9221877778b63e.jpg)
+
+Header 头部分是一个描述JWT元数据的JSON对象，承载了两部分信息：
+
+- 声明类型，如：jwt
+- 声明加密的算法，通常使用 HMAC SHA256
+
+```
+{
+  'typ': 'JWT',
+  'alg': 'HS256'
+}
+```
+
+Payload 载荷就是存放有效信息的地方
+
+- 标准中注册的声明（建议但不强制使用）
+
+  iss: jwt签发者
+
+  sub: jwt所面向的用户
+
+  aud: 接收jwt的一方
+
+  exp: jwt的过期时间，这个过期时间必须要大于签发时间
+
+  nbf: 定义在什么时间之前，该jwt都是不可用的.
+
+  iat: jwt的签发时间
+
+  jti: jwt的唯一身份标识，主要用来作为一次性token,从而回避重放攻击。
+
+- 公共的声明
+
+  公共的声明可以添加任何的信息，一般添加用户的相关信息或其他业务需要的必要信息.但不建议添加敏感信息，因为该部分在客户端可解密。
+
+
+Signature 签证信息，这个签证信息由三部分组成：
+
+- header (base64后的)
+- payload (base64后的)
+- secret
+
+**注意**：secret是保存在服务器端的，jwt的签发生成也是在服务器端的，secret就是用来进行jwt的签发和jwt的验证，所以，它就是你服务端的私钥，在任何场景都不应该流露出去。一旦客户端得知这个secret, 那就意味着客户端是可以自我签发jwt了。
+
+#### 认证流程
+
+1. 登录
+
+   用户使用用户名与秘密登录我们的系统，登录成功后颁发JWT给用户
+
+2. 发起请求
+
+   用户发起请求时在Header中携带JWT，程序拦截并检查这个token是否合法，合法则放行，不合法则提示从新登录。
+
+代码实现
+
+1）引入 JWT 依赖库
+
+```xml
+<dependency>
+    <groupId>io.jsonwebtoken</groupId>
+    <artifactId>jjwt</artifactId>
+    <version>0.12.5</version>
+</dependency>
+```
+
+2）生成 JWT
+
+```java
+/**
+ * 创建 JWT
+ *
+ * @return 返回生成的jwt token
+ */
+public static String generateJwtToken(String username, String password) {
+    return Jwts.builder()
+            .header()
+            .add("typ", "JWT")
+            .add("alg", "HS256")
+            .and()
+            .claim("username", username)
+            // 令牌ID
+            .id(UUID.randomUUID().toString())
+            // 过期日期
+            .expiration(new Date(System.currentTimeMillis() + access_token_expiration * 1000))
+            // 签发时间
+            .issuedAt(new Date())
+            // 主题
+            .subject(subject)
+            // 签发者
+            .issuer(jwt_iss)
+            // 签名
+            .signWith(KEY, ALGORITHM)
+            .compact();
+}
+```
+
+3）登录接口
+
+```java
+@RestController
+@RequestMapping("/auth")
+@RequiredArgsConstructor
+public class AuthController {
+
+    private final AuthenticationManager authenticationManager;
+
+    @RequestMapping("login")
+    public String login(String username, String password) {
+        UsernamePasswordAuthenticationToken authenticationToken =
+                new UsernamePasswordAuthenticationToken(username, password);
+        authenticationManager.authenticate(authenticationToken);
+        //上一步没有抛出异常说明认证成功，我们向用户颁发jwt令牌
+        return JWTUtil.generateJwtToken(username, password);
+    }
+
+}
+```
+
+4）拦截请求，验证 token
 
 ```java
 @Slf4j
-@Component
-public class LoginSuccessHandler implements AuthenticationSuccessHandler {
+public class JwtAuthenticationTokenFilter extends OncePerRequestFilter {
+
+    private final static String AUTH_HEADER = "Authorization";
+    private final static String AUTH_HEADER_TYPE = "Bearer";
+
+    @Autowired
+    private UserDetailsService userDetailsService;
 
     @Override
-    public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication auth) throws IOException, ServletException {
-        log.info("用户 " + auth.getName() + " 登录成功");
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
+        // get token from header:  Authorization: Bearer <token>
+        String authHeader = request.getHeader(AUTH_HEADER);
+        if (StringUtils.isEmpty(authHeader) || !authHeader.startsWith(AUTH_HEADER_TYPE)) {
+            filterChain.doFilter(request, response);
+            return;
+        }
+
+        String authToken = authHeader.split(" ")[1];
+        log.info("authToken:{}" , authToken);
+        // verify token
+        Jws<Claims> claims = JWTUtil.getClaimsFromJwt(authToken);
+        String username = (String) claims.getPayload().get("username");;
+        UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+        // 注意，这里使用的是3个参数的构造方法，此构造方法将认证状态设置为true
+        UsernamePasswordAuthenticationToken authenticationToken =
+                new UsernamePasswordAuthenticationToken(userDetails.getUsername(), userDetails.getPassword(), userDetails.getAuthorities());
+        //将认证过了凭证保存到security的上下文中以便于在程序中使用
+        SecurityContextHolder.getContext().setAuthentication(authenticationToken);
+        filterChain.doFilter(request, response);
     }
 
 }
 ```
+
+5）配置 security
 
 ```java
-@Slf4j
-@Component
-public class LoginFailureHandler implements AuthenticationFailureHandler {
-
-    @Override
-    public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response, AuthenticationException e) throws IOException, ServletException {
-        if (e instanceof AccountExpiredException) {
-            // 账号过期
-            log.info("[登录失败] - 用户账号过期");
-        } else if (e instanceof BadCredentialsException) {
-            // 密码错误
-            log.info("[登录失败] - 用户密码错误");
-        } else if (e instanceof CredentialsExpiredException) {
-            // 密码过期
-            log.info("[登录失败] - 用户密码过期");
-        } else if (e instanceof DisabledException) {
-            // 用户被禁用
-            log.info("[登录失败] - 用户被禁用");
-        } else if (e instanceof LockedException) {
-            // 用户被锁定
-            log.info("[登录失败] - 用户被锁定");
-        } else {
-            // 其他错误
-            log.error(String.format("[登录失败] - [%s]其他错误"), e);
-        }
-    }
-
-}
-```
-
-配置处理器
-
-```
+@Order(-1)
 @Configuration
 @EnableWebSecurity
-@RequiredArgsConstructor
 public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
 
-    private final LoginSuccessHandler loginSuccessHandler;
-    private final LoginFailureHandler loginFailureHandler;
-
-    @Override
-    protected void configure(HttpSecurity http) throws Exception {
-        http.authorizeRequests()
-                // 除上面外的所有请求全部需要鉴权认证
-                .anyRequest().authenticated()
-                .and()
-                .formLogin()
-                // 登录成功处理逻辑
-                .successHandler(loginSuccessHandler)
-                // 默认成功页面，第三参数如果为true，登录成功会固定调转该页面
-                .defaultSuccessUrl("/index.html", true)
-                // 登录失败处理逻辑
-                .failureHandler(loginFailureHandler)
-                .permitAll()
-                // 关闭 csrf 防御
-                .and().csrf().disable();
+    // 配置密码加密器
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
     }
-}
-```
 
-4）自定义登录页面及注销
+    @Bean
+    public AuthenticationManager authenticationManager(AuthenticationConfiguration authConfig) throws Exception {
+        return authConfig.getAuthenticationManager();
+    }
 
-login.html
-
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>登录页面</title>
-</head>
-<body>
-<form action="/login" method="post">
-    <table style="width: 255px; margin: 0 auto;">
-        <tr>
-            <td>用户名：</td>
-            <td><input type="text" name="username" /></td>
-        </tr>
-        <tr>
-            <td>密码：</td>
-            <td><input type="password" name="password" /></td>
-        </tr>
-        <tr>
-            <td></td>
-            <td style="text-align: right">
-                <input type="submit" value="提交">
-            </td>
-        </tr>
-    </table>
-</form>
-</body>
-</html>
-```
-
-
-index.html
-
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>首页</title>
-    <link rel="stylesheet" href="element-ui@2.15.13.css">
-    <script type="text/javascript" src="vue@2.7.14.js"></script>
-    <script type="text/javascript" src="element-ui@2.15.13.js"></script>
-    <script type="text/javascript" src="axios@v1.3.3.js"></script>
-</head>
-<body>
-<div id="app">
-    <span v-if="!isLogin">未登录</span>
-    <el-button type="primary" size="small" v-if="!isLogin" @click="toLoginPage">登录</el-button>
-    <span v-if="isLogin">{{ currentUser }}</span>
-    <el-button type="primary" size="small" v-if="isLogin" @click="logout">注销</el-button>
-</div>
-</body>
-<script>
-    new Vue({
-        el: "#app",
-        data() {
-            return {
-                isLogin: false,
-                currentUser: ''
-            }
-        },
-        mounted() {
-            this.getCurrentUser();
-        },
-        methods: {
-            toLoginPage() {
-                location.href = "/login.html";
-            },
-            getCurrentUser() {
-                axios.get('/auth/current-user').then(res => {
-                    if (res.status === 200 && !!res.data) {
-                        this.isLogin = true;
-                        this.currentUser = res.data;
-                    } else {
-                        this.isLogin = false;
-                        this.currentUser = '';
-                    }
-                }).catch(err => {
-                    console.log(err);
-                })
-            },
-            logout() {
-                axios.post('/logout').then(res => {
-                    location.reload();
-                }).catch(err => {
-                    console.log(err);
-                })
-            }
-        }
-    })
-</script>
-</html>
-```
-
-静态资源放过认证
-
-```java
-@Configuration
-@EnableWebSecurity
-@RequiredArgsConstructor
-public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
+    //我们自定义的拦截器
+    @Bean
+    public JwtAuthenticationTokenFilter jwtAuthenticationTokenFilter() {
+        return new JwtAuthenticationTokenFilter();
+    }
 
     @Override
     public void configure(WebSecurity web) throws Exception {
@@ -245,59 +270,29 @@ public class WebSecurityConfig extends WebSecurityConfigurerAdapter {
                 .antMatchers("/*.js")
                 .antMatchers("/*.css");
     }
-    
-}
-```
-
-注销处理器
-
-```java
-@Slf4j
-@Component
-public class MyLogoutSuccessHandler implements LogoutSuccessHandler{
 
     @Override
-    public void onLogoutSuccess(HttpServletRequest request, HttpServletResponse response, Authentication auth) throws IOException, ServletException {
-        log.info(auth.getName() + " 注销成功");
+    protected void configure(HttpSecurity http) throws Exception {
+        http.addFilterBefore(jwtAuthenticationTokenFilter(), UsernamePasswordAuthenticationFilter.class)
+                //基于token，所以不需要session
+                .sessionManagement().sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+                .and()
+                .authorizeRequests()
+                // 放行接口
+                .antMatchers("/auth/**").permitAll()
+                // 除上面外的所有请求全部需要鉴权认证
+                .anyRequest().authenticated()
+                // 关闭 csrf 防御
+                .and().csrf().disable()
+                // 禁用缓存
+                .headers().cacheControl();
     }
-
 }
 ```
 
-追加认证配置
+此时登录会返回 token，访问接口带着 token 头被拦截器拦截并验证 token 是否存在或是否过期！
 
-```java
-@Override
-protected void configure(HttpSecurity http) throws Exception {
-    http.authorizeRequests()
-        // 放行接口
-        .antMatchers("/common/**").permitAll()
-        .antMatchers("/auth/**").permitAll()
-        // 除上面外的所有请求全部需要鉴权认证
-        .anyRequest().authenticated()
-        .and()
-        .formLogin()
-        // 登录接口
-        .loginProcessingUrl("/login")
-        // 登录页面
-        .loginPage("/login.html")
-        // 登录成功处理逻辑
-        .successHandler(loginSuccessHandler)
-        // 默认成功页面，第三参数如果为true，登录成功会固定调转该页面
-        .defaultSuccessUrl("/index.html", true)
-        // 登录失败处理逻辑
-        .failureHandler(loginFailureHandler)
-        .permitAll()
-        .and()
-        .logout()
-        // 注销接口
-        .logoutUrl("/logout")
-        .logoutSuccessHandler(logoutSuccessHandler)
-        // 注销后删除 cookies
-        .deleteCookies("JSESSIONID")
-        .permitAll()
-        // 关闭 csrf 防御
-        .and().csrf().disable();
-}
-```
+参考资料：
 
+- https://zhuanlan.zhihu.com/p/625403750 秒懂SpringBoot之易懂的Spring Security教程
+- https://www.jianshu.com/p/576dbf44b2ae 什么是 JWT -- JSON WEB TOKEN
