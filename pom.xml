@@ -35,6 +35,7 @@
         <module>springboot-easyexcel</module>
         <module>springboot-easypoi</module>
         <module>springboot-rabbitmq</module>
+        <module>springboot-flyway</module>
     </modules>
 
 </project>

@@ -39,6 +39,7 @@ Spring Boot 是用来快速开发 Spring 应用的脚手架，其设计目的就
 - Spring Boot RestTemplate HTTP 请求
 - Spring Boot Excel - EasyExcel版
 - Spring Boot Excel - EasyPoi版
+- Spring Boot 集成 flyway 数据库版本管理工具
 
 辅助功能
 
