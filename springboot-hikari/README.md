@@ -6,7 +6,7 @@ Hikari 是一位日本开发者创作的数据库连接池，意为“光”，�
 
 Hikari 最引以为傲的就是它的性能，从作者 Github 上的图中可以看出，Hikari 在 获取和释放 Connection 和 Statement 方法的 OPS 不是一般的高，那是相当的高，碾压其余连接池。
 
-![](D:\workspace\practice-master\springboot-master\code\springboot-hikari\HikariCP-bench-2.6.0.png)
+![](.\HikariCP-bench-2.6.0.png)
 
 **为什么这么快！**
 

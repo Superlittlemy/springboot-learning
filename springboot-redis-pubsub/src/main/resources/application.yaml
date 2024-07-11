@@ -1,0 +1,8 @@
+spring:
+  redis:
+    host: localhost
+    database: 0
+    port: 16379
+redis:
+  topic:
+    test: test

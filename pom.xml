@@ -36,6 +36,7 @@
         <module>springboot-easypoi</module>
         <module>springboot-rabbitmq</module>
         <module>springboot-flyway</module>
+        <module>springboot-redis-pubsub</module>
     </modules>
 
 </project>
