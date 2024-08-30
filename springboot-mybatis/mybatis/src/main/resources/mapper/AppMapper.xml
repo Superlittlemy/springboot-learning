@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.slm.mybatis.mapper.AppMapper">
+
+    <resultMap id="app" type="com.slm.mybatis.entity.App">
+        <id property="id" column="id" />
+        <result property="name" column="name" />
+        <result property="config"
+                column="config"
+                javaType="com.slm.mybatis.model.AppConfig" jdbcType="VARCHAR"
+                typeHandler="com.slm.mybatis.typeHandler.JSONHandler" />
+<!--        <association property="owner" column="owner" javaType="com.slm.mybatis.entity.User">-->
+<!--            <id property="id" column="user_id" />-->
+<!--            <result property="name" column="user_name" />-->
+<!--            <result property="birthday" column="user_birthday" />-->
+<!--        </association>-->
+<!--        <association property="owner" column="owner" resultMap="appOwner" columnPrefix="user_" />-->
+<!--        <association property="owner" column="owner" javaType="com.slm.mybatis.entity.User" select="getUserById" fetchType="lazy" />-->
+        <association property="owner" column="owner" javaType="com.slm.mybatis.entity.User" autoMapping="true" columnPrefix="user_" />
+        <collection property="users" javaType="java.util.ArrayList" ofType="com.slm.mybatis.entity.User" column="owner" select="getUserById" />
+    </resultMap>
+
+<!--    <resultMap id="appOwner" type="com.slm.mybatis.entity.User">-->
+<!--        <id property="id" column="id" />-->
+<!--        <result property="name" column="name" />-->
+<!--        <result property="birthday" column="birthday" />-->
+<!--    </resultMap>-->
+
+    <select id="getAppById" resultMap="app">
+        select
+            a.*,
+            u.id as user_id,
+            u.name as user_name,
+            u.birthday as user_birthday
+        from app a
+        left join user u on a.owner = u.id
+        where a.id = #{id}
+    </select>
+
+    <select id="getUserById" resultType="com.slm.mybatis.entity.User">
+        select * from user where id = #{id}
+    </select>
+
+</mapper>

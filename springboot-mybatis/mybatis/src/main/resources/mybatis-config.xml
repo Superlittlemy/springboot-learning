@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE configuration
+        PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-config.dtd">
+<!-- configuration 核心配置文件 -->
+<configuration>
+
+    <!-- 引入数据库配置 -->
+    <properties resource="database.properties" />
+
+    <!-- Mybatis 设置 -->
+    <settings>
+        <setting name="mapUnderscoreToCamelCase" value="true"/>
+        <setting name="logImpl" value="STDOUT_LOGGING"/>
+    </settings>
+
+    <plugins>
+        <!-- 分页插件 -->
+        <plugin interceptor="com.github.pagehelper.PageInterceptor">
+            <!-- config params as the following -->
+            <!--<!–分页参数合理化  –>-->
+            <property name="reasonable" value="true"/>
+        </plugin>
+    </plugins>
+
+    <!-- 默认数据库环境 -->
+    <environments default="development">
+        <environment id="development">
+            <transactionManager type="JDBC" />
+            <dataSource type="POOLED">
+                <property name="driver" value="${db.driver}"/>
+                <property name="url" value="${db.url}"/>
+                <property name="username" value="${db.username}"/>
+                <property name="password" value="${db.password}"/>
+            </dataSource>
+        </environment>
+    </environments>
+
+    <!-- 注册映射文件 -->
+    <mappers>
+        <mapper resource="mapper/UserMapper.xml" />
+<!--        <mapper class="com.slm.mybatis.mapper.AppMapper" />-->
+        <mapper resource="mapper/AppMapper.xml" />
+<!--        <package name="com.slm.mybatis.mapper"/>-->
+    </mappers>
+
+</configuration>

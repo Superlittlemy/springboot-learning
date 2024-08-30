@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:tx="http://www.springframework.org/schema/tx"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/context
+       http://www.springframework.org/schema/context/spring-context.xsd
+       http://www.springframework.org/schema/tx
+       http://www.springframework.org/schema/tx/spring-tx.xsd">
+
+    <context:component-scan base-package="com.slm.mybatis.spring" />
+
+    <!-- MyBatis POOLED 数据源 -->
+    <bean id="dataSource" class="org.apache.ibatis.datasource.pooled.PooledDataSource">
+        <property name="driver" value="com.mysql.cj.jdbc.Driver" />
+        <property name="url" value="jdbc:mysql://localhost:3306/bsp?useUnicode=true&amp;characterEncoding=utf-8" />
+        <property name="username" value="root" />
+        <property name="password" value="123456" />
+    </bean>
+
+    <!-- MyBatis 与 Spring 整合 -->
+    <!-- MyBatis Settings Configuration -->
+    <bean id="mybatisConfig" class="org.apache.ibatis.session.Configuration">
+        <!-- 驼峰转换 -->
+        <property name="mapUnderscoreToCamelCase" value="true" />
+        <!-- 懒加载 -->
+        <property name="lazyLoadingEnabled" value="true" />
+    </bean>
+
+    <!-- 创建 SqlSessionFactory -->
+    <bean id="sqlSessionFactory" class="org.mybatis.spring.SqlSessionFactoryBean">
+        <!-- 指定数据源 -->
+        <property name="dataSource" ref="dataSource" />
+        <!-- 自动扫描 mapper.xml 文件路径 -->
+        <property name="mapperLocations" value="mapper/**" />
+        <!-- 配置 settings -->
+        <property name="configuration" ref="mybatisConfig" />
+        <!-- 插件 plugins -->
+        <property name="plugins">
+            <!-- [] 注入 -->
+            <array>
+                <!-- 分页插件 -->
+                <bean class="com.github.pagehelper.PageInterceptor">
+                    <property name="properties">
+                        <!-- Properties 注入 -->
+                        <props>
+                            <!-- 分页参数合理化 -->
+                            <prop key="reasonable">true</prop>
+                        </props>
+                    </property>
+                </bean>
+            </array>
+        </property>
+    </bean>
+
+    <!-- Mapper 包扫描 -->
+    <bean class="org.mybatis.spring.mapper.MapperScannerConfigurer">
+        <property name="basePackage" value="com.slm.mybatis.spring.mapper" />
+    </bean>
+
+    <!-- Spring 事务 -->
+    <bean id="transactionManager" class="org.springframework.jdbc.datasource.DataSourceTransactionManager">
+        <property name="dataSource" ref="dataSource"/>
+    </bean>
+
+    <!-- 开启注释事务管理 -->
+    <tx:annotation-driven />
+
+</beans>
