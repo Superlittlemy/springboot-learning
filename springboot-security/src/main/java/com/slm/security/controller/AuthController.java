@@ -1,5 +1,6 @@
 package com.slm.security.controller;
 
+import com.slm.security.model.ApiResponse;
 import com.slm.security.utils.JWTUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -15,12 +16,12 @@ public class AuthController {
     private final AuthenticationManager authenticationManager;
 
     @RequestMapping("login")
-    public String login(String username, String password) {
+    public ApiResponse<String> login(String username, String password) {
         UsernamePasswordAuthenticationToken authenticationToken =
                 new UsernamePasswordAuthenticationToken(username, password);
         authenticationManager.authenticate(authenticationToken);
         //上一步没有抛出异常说明认证成功，我们向用户颁发jwt令牌
-        return JWTUtil.generateJwtToken(username, password);
+        return ApiResponse.ok(JWTUtil.generateJwtToken(username, password));
     }
 
 }

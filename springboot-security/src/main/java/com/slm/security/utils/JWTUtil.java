@@ -20,8 +20,8 @@ public class JWTUtil {
     private final static String secret = "$2a$10$kmcxrdyU/UbcXdtQfFu/d.7gKwo20N2z/lQ2nCw9wWZcKepYoLtn.";
     public static final SecretKey KEY = Keys.hmacShaKeyFor(secret.getBytes());
 
-    // 过期时间（单位秒）/ 2小时
-    private final static Long access_token_expiration = 7200L;
+    // 过期时间（单位秒）
+    private final static Long access_token_expiration = 24 * 60 * 60L;
 
     //jwt签发者
     private final static String jwt_iss = "spzhang";

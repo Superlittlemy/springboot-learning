@@ -13,7 +13,7 @@ Spring Security 的核心是提供认证（Authentication）、授权（Authoriz
 
 Spring Security 核心是通过自动装配组成过滤器链，逐步完成认证和授权，发现异常则抛给异常处理器处理
 
-![](.\14483918-baacf316904e06b7.webp)
+![](assets\14483918-baacf316904e06b7.webp)
 
 ### 默认实现
 
@@ -55,7 +55,7 @@ public class MyUserDetailsService implements UserDetailsService {
 
 一个请求过来 Spring Security 会按照下图的步骤处理：
 
-![](D:\workspace\springboot-learning\springboot-security\asserts\v2-7836b6bc78e9b8316bba24696bd734a0_720w.png)
+![](assets\v2-7836b6bc78e9b8316bba24696bd734a0_720w.png)
 
 - Filter：拦截Http请求，获取用户名和秘密等认证信息
 
@@ -78,7 +78,7 @@ public class MyUserDetailsService implements UserDetailsService {
 
 JWT 由一下三部分组成：Header、Payload 和 Signature
 
-![](D:\workspace\springboot-learning\springboot-security\asserts\13587608-4b9221877778b63e.jpg)
+![](assets\13587608-4b9221877778b63e.jpg)
 
 Header 头部分是一个描述JWT元数据的JSON对象，承载了两部分信息：
 
