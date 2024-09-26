@@ -3,3 +3,6 @@ spring:
     scheduling:
       pool:
         size: 10
+application:
+  task:
+    dynamicCron: 0/5 * * * * ?

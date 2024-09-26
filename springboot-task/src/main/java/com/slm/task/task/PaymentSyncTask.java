@@ -23,7 +23,7 @@ public class PaymentSyncTask {
         if (i % 3 == 0) {
             Thread.sleep(10000);
         }
-        log.info("固定每3S更新报表 " + i);
+        log.info("固定每3S更新报表 {}", i);
     }
 
     // 每日报表计算

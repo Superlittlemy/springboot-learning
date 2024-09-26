@@ -18,13 +18,13 @@ Spring Boot Task 定时任务
 
   从上一次任务结束开始计算，间隔设定的时间执行
 
-  ![](D:\workspace\practice-master\springboot-master\code\springboot-task\7f1nu1pof4.png)
+  ![](assets\7f1nu1pof4.png)
 
 - fixedRate
 
   固定周期运行，由于 Spring Boot 定时任务默认是以单线程方式执行，所以如果前一个任务会阻塞后续任务执行。在该模式下，如果前一个任务耗时较长，在 fixedRate 任务周期到达时未完成造成阻塞，那任务就会超时执行，但不会丢失执行动作，如果阻塞较长多个任务堆积，可能阻塞释放后该模式下的任务密集执行。
 
-  ![](D:\workspace\practice-master\springboot-master\code\springboot-task\sy1i5at8f9.png)
+  ![](assets\sy1i5at8f9.png)
 
 **上代码**
 
@@ -60,7 +60,7 @@ public class PaymentSyncTask {
 }
 ```
 
-在第二个任务中，没三次模拟了一次超长耗时阻塞，让我们来看看执行效果：
+在第二个任务中，每三次模拟了一次超长耗时阻塞，让我们来看看执行效果：
 
 ```
 2023-10-12 18:18:32.757  INFO 23056 --- [   scheduling-1] com.slm.task.task.PaymentSyncTask        : 固定每3S更新报表 1
@@ -158,3 +158,81 @@ spring:
 ```
 
 可以看到更新报表任务的超长耗时并没有阻塞到拉取支付状态任务，但更新报表任然存在阻塞，这是 fixedRate 模式的特点。
+
+### 动态定时任务
+
+在 Spring框架中，创建定时任务通常有两种方式：使用 ***@Scheduled*** 注解和实现 ***SchedulingConfigurer*** 接口。@Scheduled 注解的限制在于它的定时时间是静态的，一旦设定就无法更改，除非重新启动服务。相比之下，SchedulingConfigurer 接口提供了更大的灵活性，允许从数据库动态获取定时任务的执行周期，从而实现定时任务的动态调整。
+
+**定时任务源码解析**
+
+从开启定时任务的注解 ***@EnableScheduling*** 开始
+
+```java
+@Target(ElementType.TYPE)
+@Retention(RetentionPolicy.RUNTIME)
+@Import(SchedulingConfiguration.class)
+@Documented
+public @interface EnableScheduling {
+
+}
+```
+
+导入了 SchedulingConfiguration 类，内部注册了 ScheduledAnnotationBeanPostProcessor
+
+![image-20240925144156222](assets/image-20240925144156222.png)
+
+该类也是一个 BeanPostProcessor，实现了 postProcessAfterInitialization 方法，在这里实现了对 Bean 内标注 @Scheduled 注解的方法扫描并执行 processScheduled 方法将任务注册到 ScheduledTaskRegistrar 中
+
+**ScheduledTaskRegistrar**
+
+> Helper bean for registering tasks with a TaskScheduler（via Spring-context-5.2.9.RELEASE）
+>
+> 用于向 TaskScheduler 注册任务的 Helper bean
+
+内部有多种用于注册任务的方法，例如 @Scheduled 可配置的 CronTask、FixedDelayTask、FixedRateTask，也可以自行添加任务
+
+```java
+public void addTriggerTask(Runnable task, Trigger trigger) {
+	addTriggerTask(new TriggerTask(task, trigger));
+}
+public void addTriggerTask(TriggerTask task) {
+    if (this.triggerTasks == null) {
+        this.triggerTasks = new ArrayList<>();
+    }
+    this.triggerTasks.add(task);
+}
+```
+
+该类除了是任务的注册器，还是实际推送至执行线程池的推手，在 InitializingBean.afterPropertiesSet 接口实现中将任务提交给了 TaskScheduler，如果没有给定 taskScheduler，在随送任务之前会创建一个单线程定时任务执行器，这也是为什么 Spring Boot 定时任务默认是同步的原因！
+
+下一步，ScheduledAnnotationBeanPostProcessor 会触发 ContextRefreshedEvent 监听，在 refresh 阶段完成后进行 SchedulingConfigurer 自定义实现类的注册和 TaskScheduler 的获取。
+
+**SchedulingConfigurer**
+
+定时任务配置器，有且仅有一个方法 `void configureTasks(ScheduledTaskRegistrar taskRegistrar)` 用于配置任务。得益于 ScheduledTaskRegistrar 注册任务的方法入参均为接口，可以允许我们在传入时自定义实现接口，在此期间可以实时获取来此外层的数据
+
+```java
+@Value("${application.task.dynamicCron}")
+private String cron;
+@Override
+public void configureTasks(ScheduledTaskRegistrar taskRegistrar) {
+    // 动态使用cron表达式设置循环间隔
+    taskRegistrar.addTriggerTask(new Runnable() {
+        @Override
+        public void run() {
+            log.info("Current time： {}", LocalDateTime.now());
+        }
+    }, new Trigger() {
+        @Override
+        public Date nextExecutionTime(TriggerContext triggerContext) {
+            // 使用CronTrigger触发器，可动态修改cron表达式来操作循环规则
+            CronTrigger cronTrigger = new CronTrigger(cron);
+            Date nextExecutionTime = cronTrigger.nextExecutionTime(triggerContext);
+            return nextExecutionTime;
+        }
+    });
+}
+```
+
+当上述方法中的 Trigger.nextExecutionTime 被触发时，会获取实际的 cron 数值以实现动态配置！
+
