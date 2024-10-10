@@ -493,7 +493,7 @@ Executor 有一个抽象类 BaseExecutor，MyBatis 通过模板方法的设计�
 
 实现类结构图
 
-![](assets\README\Snipaste_2024-08-14_10-00-21.png)
+![](assets/README/Snipaste_2024-08-14_10-00-21.png)
 
 缓存可以减少不必要的资源访问，让查询从远端访问提升到近端获取，提高了系统性能。MyBatis 的**一级缓存**作用域是 SqlSession 级别的，每当我们开启一个数据库会话，短时间内访问同一份数据都是一样的。PS：但是在事务提交后，一级缓存会被清空，所以如果存在独立事务的需求，内部一级缓存是无法共享的
 
@@ -565,72 +565,72 @@ MyBatis 默认是开启二级缓存的，但是实际使用还需要在 mapper.x
 
 ### 分页
 
-1. 基于 RowBounds 实现（逻辑分页）
+1.基于 RowBounds 实现（逻辑分页）
 
-   PS：Mybatis Mapper 代理类的功能，如果使用 SqlSession.selectList 是无法触发 RowBounds 的
+PS：Mybatis Mapper 代理类的功能，如果使用 SqlSession.selectList 是无法触发 RowBounds 的
 
-   使用方式：在 mapper.class 的方法参数中传入 RowBounds 即可
+使用方式：在 mapper.class 的方法参数中传入 RowBounds 即可
 
-   ```java
-   List<User> queryPage(RowBounds rowBounds);
-   ```
+```java
+List<User> queryPage(RowBounds rowBounds);
+```
 
-   通过对结果集的处理源码递进跟踪，最终落到了 DefaultResultSetHandler.class
+通过对结果集的处理源码递进跟踪，最终落到了 DefaultResultSetHandler.class
 
-   ```java
-   private void handleRowValuesForSimpleResultMap(ResultSetWrapper rsw, ResultMap resultMap, ResultHandler<?> resultHandler, RowBounds rowBounds, ResultMapping parentMapping) throws SQLException {
-       DefaultResultContext<Object> resultContext = new DefaultResultContext<>();
-       ResultSet resultSet = rsw.getResultSet();
-       // 根据 RowBounds.offset 参数跳过页前的数据
-       skipRows(resultSet, rowBounds);
-       // shouldProcessMoreRows 根据 RowBounds.limit 参数逐一循环判断
-       while (shouldProcessMoreRows(resultContext, rowBounds) && !resultSet.isClosed() && resultSet.next()) {
-          ResultMap discriminatedResultMap = resolveDiscriminatedResultMap(resultSet, resultMap, null);
-          Object rowValue = getRowValue(rsw, discriminatedResultMap, null);
-          // storeObject 将每一次循环的结果集存在了 ResultHandler 类中，供后续提取
-          storeObject(resultHandler, resultContext, rowValue, parentMapping, resultSet);
-       }
-   }
-   ```
+```java
+private void handleRowValuesForSimpleResultMap(ResultSetWrapper rsw, ResultMap resultMap, ResultHandler<?> resultHandler, RowBounds rowBounds, ResultMapping parentMapping) throws SQLException {
+    DefaultResultContext<Object> resultContext = new DefaultResultContext<>();
+    ResultSet resultSet = rsw.getResultSet();
+    // 根据 RowBounds.offset 参数跳过页前的数据
+    skipRows(resultSet, rowBounds);
+    // shouldProcessMoreRows 根据 RowBounds.limit 参数逐一循环判断
+    while (shouldProcessMoreRows(resultContext, rowBounds) && !resultSet.isClosed() && resultSet.next()) {
+        ResultMap discriminatedResultMap = resolveDiscriminatedResultMap(resultSet, resultMap, null);
+        Object rowValue = getRowValue(rsw, discriminatedResultMap, null);
+        // storeObject 将每一次循环的结果集存在了 ResultHandler 类中，供后续提取
+        storeObject(resultHandler, resultContext, rowValue, parentMapping, resultSet);
+    }
+}
+```
 
-2. 基于 PageHelper 插件实现（物理分页）
+2.基于 PageHelper 插件实现（物理分页）
 
-   官方文档：https://github.com/pagehelper/Mybatis-PageHelper/blob/master/wikis/zh/HowToUse.md
+官方文档：https://github.com/pagehelper/Mybatis-PageHelper/blob/master/wikis/zh/HowToUse.md
 
-   使用方式：
+使用方式：
 
-   1）引入依赖
+1）引入依赖
 
-   ```xml
-   <dependency>
-       <groupId>com.github.pagehelper</groupId>
-       <artifactId>pagehelper</artifactId>
-   </dependency>
-   ```
+```xml
+<dependency>
+   <groupId>com.github.pagehelper</groupId>
+   <artifactId>pagehelper</artifactId>
+</dependency>
+```
 
-   2）在 mybatis-config.xml 配置文件中添加 plugin
+2）在 mybatis-config.xml 配置文件中添加 plugin
 
-   ```xml
-   <plugins>
-       <!-- 分页插件 -->
-       <plugin interceptor="com.github.pagehelper.PageInterceptor">
-           <!-- 参数合理化：pageNum<=0 时会查询第一页， pageNum>pages（超过总数时），会查询最后一页。默认false 时，直接根据参数进行查询 -->
-           <property name="reasonable" value="true"/>
-       </plugin>
-   </plugins>
-   ```
+```xml
+<plugins>
+   <!-- 分页插件 -->
+   <plugin interceptor="com.github.pagehelper.PageInterceptor">
+       <!-- 参数合理化：pageNum<=0 时会查询第一页， pageNum>pages（超过总数时），会查询最后一页。默认false 时，直接根据参数进行查询 -->
+       <property name="reasonable" value="true"/>
+   </plugin>
+</plugins>
+```
 
-   3）实战演示
+3）实战演示
 
-   ```java
-   // mapper 接口方法调用（推荐）
-   PageHelper.startPage(1, 1);
-   Page<User> users = mapper.queryPageByPlugin();
-   // ISelect 接口方法调用
-   Page<User> users = PageHelper.startPage(1, 1).doSelectPage(mapper::queryPageByPlugin);
-   ```
+```java
+// mapper 接口方法调用（推荐）
+PageHelper.startPage(1, 1);
+Page<User> users = mapper.queryPageByPlugin();
+// ISelect 接口方法调用
+Page<User> users = PageHelper.startPage(1, 1).doSelectPage(mapper::queryPageByPlugin);
+```
 
-   PS：Page 类是 ArrayList 的子类，即使 mapper 返回类型为 List，实际类型也是 Page。ISelect 接口方式可以讲声明范围 List 类型转为 Page 类型
+PS：Page 类是 ArrayList 的子类，即使 mapper 返回类型为 List，实际类型也是 Page。ISelect 接口方式可以讲声明范围 List 类型转为 Page 类型
 
 ### Demo
 
@@ -1166,7 +1166,7 @@ PS：注解只对 public 修饰的方法有效
 
 功能来自 tx 标签，而引入这个标签的 schema 来自 spring-tx 模块，而每个标签在对应模块的 META-INF 下都有一份 spring.handlers 文件，里面存放了对应命名空间下可选元素的处理器
 
-![image-20240830132239293](.\assets\README\image-20240830132239293.png)
+![image-20240830132239293](assets/README/image-20240830132239293.png)
 
 进入 TxNamespaceHandler 就会发现在类初始化的时候注册了可选元素的名称
 
@@ -1224,7 +1224,7 @@ public class TransactionInterceptor extends TransactionAspectSupport implements 
 
 ##### 事务逻辑梳理图
 
-![](D:\workspace\springboot-learning\springboot-mybatis\assets\README\Snipaste_2024-09-13_11-25-45.png)
+![](assets/README/Snipaste_2024-09-13_11-25-45.png)
 
 **注意事项**
 
@@ -1308,24 +1308,24 @@ targetConfiguration.setEnvironment(new Environment(this.environment, (Transactio
 
 MyBatis-Spring 映射类均使用 MapperFactoryBean 生成代理，代理增强为 MapperProxy
 
-![image-20240914105059726](assets\README\image-20240914105059726.png)
+![image-20240914105059726](assets/README/image-20240914105059726.png)
 
 <center>
     MapperRegistry.getMapper
 </center>
 
-![image-20240914105122821](assets\README\image-20240914105122821.png)
+![image-20240914105122821](assets/README/image-20240914105122821.png)
 
 <center>
     MapperProxyFactory.newInstance
 </center>
 MapperProxy 持有了传入的 SqlSession，即 SqlSessionTemplate。在实际 SQL 运行时，SqlSessionTemplate 使用的时内部生成的执行代理类 sqlSessionProxy，该代理类使用了 SqlSessionInterceptor 拦截器
 
-![image-20240914105257733](assets\README\image-20240914105257733.png)
+![image-20240914105257733](assets/README/image-20240914105257733.png)
 
 在 SqlSessionInterceptor 拦截器内部使用 SqlSessionFactory 获取事务得到上一步的事务工厂生成了 Spring 事务并封装入 DefaultSqlSession
 
-![image-20240914111022314](assets\README\image-20240914111022314.png)
+![image-20240914111022314](assets/README/image-20240914111022314.png)
 
 <center>
     事务提交过程
@@ -1333,7 +1333,7 @@ MapperProxy 持有了传入的 SqlSession，即 SqlSessionTemplate。在实际 S
 
 #### 事务与各组件联动
 
-![](assets\README\PixPin_2024-09-13_16-43-04.png)
+![](assets/README/PixPin_2024-09-13_16-43-04.png)
 
 ## Spring Boot 集成 Mybatis
 
