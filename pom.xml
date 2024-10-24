@@ -37,9 +37,7 @@
         <module>springboot-rabbitmq</module>
         <module>springboot-flyway</module>
         <module>springboot-redis-pubsub</module>
-        <module>springboot-mybatis/mybatis</module>
-        <module>springboot-mybatis/mybatis-spring</module>
-        <module>springboot-mybatis/mybatis-spring-boot</module>
+        <module>springboot-jta-atomikos</module>
     </modules>
 
 </project>

@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xmlns:context="http://www.springframework.org/schema/context"
+       xmlns:tx="http://www.springframework.org/schema/tx"
+       xsi:schemaLocation="
+       http://www.springframework.org/schema/beans
+       http://www.springframework.org/schema/beans/spring-beans.xsd
+       http://www.springframework.org/schema/context
+       http://www.springframework.org/schema/context/spring-context.xsd
+       http://www.springframework.org/schema/tx
+       http://www.springframework.org/schema/tx/spring-tx.xsd">
+
+    <!-- 组件扫描 -->
+    <context:component-scan base-package="com.slm.atomikos.spring" />
+
+    <!-- 数据库连接配置文件 -->
+    <context:property-placeholder location="db.properties" />
+
+    <!-- Atomikos 数据源01 -->
+    <bean id="dataSource1" class="com.atomikos.jdbc.AtomikosDataSourceBean">
+        <property name="uniqueResourceName" value="dataSource1" />
+        <!-- 数据源类型 -->
+        <property name="xaDataSourceClassName" value="${db1.dataSourceClass}" />
+        <!-- 数据库连接属性 -->
+        <property name="xaProperties">
+            <props>
+                <prop key="url">${db1.url}</prop>
+                <prop key="user">${db1.user}</prop>
+                <prop key="password">${db1.password}</prop>
+            </props>
+        </property>
+    </bean>
+
+    <!-- Atomikos 数据源01 -->
+    <bean id="dataSource2" class="com.atomikos.jdbc.AtomikosDataSourceBean">
+        <property name="uniqueResourceName" value="dataSource2" />
+        <!-- 数据源类型 -->
+        <property name="xaDataSourceClassName" value="${db2.dataSourceClass}" />
+        <!-- 数据库连接属性 -->
+        <property name="xaProperties">
+            <props>
+                <prop key="url">${db2.url}</prop>
+                <prop key="user">${db2.user}</prop>
+                <prop key="password">${db2.password}</prop>
+            </props>
+        </property>
+    </bean>
+
+    <!-- UserTransaction -->
+    <bean id="userTransaction" class="com.atomikos.icatch.jta.UserTransactionImp" />
+    <bean id="userTransactionManager" class="com.atomikos.icatch.jta.UserTransactionManager" />
+
+    <!-- jta 事务 -->
+    <bean id="transactionManager" class="org.springframework.transaction.jta.JtaTransactionManager">
+        <constructor-arg ref="userTransaction" />
+        <constructor-arg ref="userTransactionManager" />
+    </bean>
+
+    <!-- 开启注释事务管理 -->
+    <tx:annotation-driven />
+
+</beans>
