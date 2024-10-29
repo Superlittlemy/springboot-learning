@@ -38,6 +38,7 @@
         <module>springboot-flyway</module>
         <module>springboot-redis-pubsub</module>
         <module>springboot-jta-atomikos</module>
+        <module>springboot-tcc</module>
     </modules>
 
 </project>

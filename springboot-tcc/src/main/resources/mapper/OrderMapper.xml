@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.slm.tcc.mapper.OrderMapper">
+
+    <insert id="create" parameterType="com.slm.tcc.entity.TccOrder" useGeneratedKeys="true" keyProperty="id">
+        insert into tcc_order (product_id, product_name, product_num, product_price, order_amount, order_status, order_time)
+        values (#{productId}, #{productName}, #{productNum}, #{productPrice}, #{orderAmount}, #{orderStatus}, #{orderTime})
+    </insert>
+
+    <update id="confirm" parameterType="java.lang.Long">
+        update tcc_order set order_status = 1 where id = #{id}
+    </update>
+
+    <update id="cancel" parameterType="java.lang.Long">
+        update tcc_order set status = 9 where id = #{id}
+    </update>
+
+    <select id="getAutocloseOrder" resultType="com.slm.tcc.entity.TccOrder">
+        select * from tcc_order where order_status = 0 and order_time &lt; date_add(now(), interval 15 minute) order by order_time limit 10
+    </select>
+
+</mapper>

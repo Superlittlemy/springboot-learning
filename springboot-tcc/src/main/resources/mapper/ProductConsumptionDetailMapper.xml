@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.slm.tcc.mapper.ProductConsumptionDetailMapper">
+
+    <select id="getByOrderId" parameterType="java.lang.Long" resultType="com.slm.tcc.entity.ProductConsumptionDetail">
+        select * from product_consumption_detail where order_id = #{order_id} and status = 0;
+    </select>
+
+    <insert id="create" parameterType="com.slm.tcc.entity.ProductConsumptionDetail" useGeneratedKeys="true" keyProperty="id">
+        insert into product_consumption_detail (product_id, num, order_id, status, created_time)
+        values (#{productId}, #{num}, #{orderId}, #{status}, now())
+    </insert>
+
+    <update id="confirm" parameterType="java.lang.Long">
+        update product_consumption_detail set status = 1 where order_id = #{id} and status = 0;
+    </update>
+
+    <update id="cancel" parameterType="java.lang.Long">
+        update product_consumption_detail set status = 9, updated_time = now() where order_id = #{id} and status != 9;
+    </update>
+
+</mapper>

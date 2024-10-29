@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.slm.tcc.mapper.ProductMapper">
+
+    <select id="getById" parameterType="java.lang.Long" resultType="com.slm.tcc.entity.Product">
+        select * from product where id = #{id}
+    </select>
+
+    <update id="deductCount">
+        update product set num = num - #{num} where id = #{id} and num - #{num} >= 0
+    </update>
+
+    <update id="cancelDeduct">
+        update product
+        join product_consumption_detail pcd on product.id = pcd.product_id and pcd.id = #{detailId}
+        set product.num = product.num + pcd.num
+        where product.id = #{productId}
+    </update>
+
+</mapper>
