@@ -1,0 +1,38 @@
+server:
+  port: 9001
+spring:
+  application:
+    name: order-server
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/se_order?useUnicode=true&characterEncoding=utf-8
+    username: root
+    password: 123456
+  cloud:
+    nacos:
+      server-addr: localhost:8848
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+application:
+  storage:
+    url: http://localhost:9002
+  account:
+    url: http://localhost:9003
+seata:
+  enabled: true
+  application-id: ${spring.application.name}
+  tx-service-group: ${spring.application.name}-group
+  service:
+    vgroup-mapping:
+      order-server-group: default
+  registry:
+    type: nacos
+    nacos:
+      application: seata-server
+      server-addr: 127.0.0.1:8848
+      namespace:
+      group: SEATA_GROUP
+  data-source-proxy-mode: AT
