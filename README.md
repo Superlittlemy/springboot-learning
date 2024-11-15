@@ -47,3 +47,4 @@ Spring Boot 是用来快速开发 Spring 应用的脚手架，其设计目的就
 辅助功能
 
 - 热部署（spring-boot-devtools）
+- 使用 Dockerfile 构建 Docker 镜像
