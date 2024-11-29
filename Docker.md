@@ -6,7 +6,7 @@ Docker 是基于 Go 语言实现的开源容器项目
 
 为什么要使用 Docker？
 
-1. 无视底层操作系统
+1. 一致的运行环境
 2. 更便捷的部署和运维
 3. 更高效的资源利用
 
@@ -205,11 +205,11 @@ windows
 1. 拉取 registry：`docker pull registry:2`
 2. 启动仓库：`docker run -d -p 5000:5000 --name registry registry:2`
 
-查看私有库上面的镜像：`curl -XGET http://ip:port/v2/_catalog`
+查看私有库上面的镜像：`curl -XGET http://{ip}:{port}/v2/_catalog`
 
-上传镜像到指定仓库：`docker push ip:port/image[:tag]`
+上传镜像到指定仓库：`docker push {ip}:{port}/image[:tag]`
 
-拉取指定仓库镜像：`docker pull ip:port/image[:tag]`
+拉取指定仓库镜像：`docker pull {ip}:{port}/image[:tag]`
 
 :star: 配置私有仓库
 
@@ -227,7 +227,115 @@ windows
 
 拉取私有仓库镜像：`docker pull ip:port/image[:tag]`
 
+**HTTP API**
+
+- 查看镜像 tags：`curl {ip}:{port}/v2/image/tags/list`
+- 查询镜像 digest_hash：`curl --header "Accept: application/vnd.docker.distribution.manifest.v2+json" -I -X GET {ip}:{port}/v2/image/manifests/{tag}`
+- 删除镜像 tag：`curl -I -X DELETE {ip}:{port}/v2/openresty/manifests/{digest_hash}`
+
+**认证配置**
+
+## Docker 架构
+
+![img](assets/Docker/v2-0cf7fc656c99daba915231805ff65dca_1440w.jpg)
+
+- Containerd
+
+  Containerd 是 docker 基于行业标准创建的核心容器运行时。它可以用作 Linux 和 Windows 的守护进程，并管理整个容器生命周期：镜像的传输和存储、容器的执行和管理、存储和网络等。
+
+- runC：轻量级的容器运行时
+
+  我们可以认为它就是个命令行小工具，可以不用通过 docker 引擎，直接运行容器。事实上，runC 是标准化的产物，它根据 OCI 标准来创建和运行容器。而 OCI(Open Container Initiative)组织，旨在围绕容器格式和运行时制定一个开放的工业化标准。
+
+![image-20241118112726194](assets/Docker/image-20241118112726194.png)
+
+### UnionFS（联合文件系统）
+
+Union 文件系统是一种分层、轻量级并且高性能的文件系统，它支持对文件系统的修改作为一次提交来一层层的叠加，同时可以将不同目录挂载到同一个虚拟文件系统下。容器镜像设计中，为了解决各类依赖以及依赖共享，正是利用 UnionFs 实现了镜像分层，再结合 bootfs、rootfs，一层层继承、叠加。启动容器时把相关的层挂载到一个目录，作为容器的根文件系统，这就是容器镜像的原理。
+
+- bootfs（boot file system）：主要包含 bootloader 和 kernel，在内核启动后，bootfs 会被卸载。
+- rootfs（root file system）：包含系统常见的目录结构，如 /dev，/proc， /bin，/etc 等标准目录和文件。rootfs 就是各种不同的操作系统发行版，比如 Ubuntu，Centos 等等。
+
+![Docker镜像的内部结构(四)](assets/Docker/watermark,size_16,text_QDUxQ1RP5Y2a5a6i,color_FFFFFF,t_100,g_se,x_10,y_10,shadow_90,type_ZmFuZ3poZW5naGVpdGk=.jpeg)
+
+### 分层存储（Layered Storage）
+
+Docker Hub 中 99% 的镜像都是通过在 base 镜像中安装和配置需要的软件构建出来的。每个 Docker 镜像由多个层叠加而成，每一层代表一个文件系统的快照，这些层共同构成了一个完整的镜像文件系统。
+
+分层存储的用途：
+
+- 镜像复用：当多个镜像共享相同的基础层时，它们只需要在本地存储中保存一份基础层的副本，避免了重复存储相同内容的问题。
+- 镜像的传输效率：镜像的分层存储结构允许只传输更改的层，而不是整个镜像，因此在传输时只需要传输更新的部分，减少了传输的数据量，提高了传输效率。
+- 镜像的版本管理：每个镜像层都是只读的，当需要更新或修改镜像时，只需新增一层来覆盖原有的层，这样就可以实现版本管理，方便用户管理和回滚镜像的不同版本。
+
+**可写的容器层**
+
+当容器启动时，一个新的可写层被加载到镜像的顶部。这一层通常被称作“容器层”，“容器层”之下的都叫“镜像层”。所有对容器的改动，无论添加、删除、还是修改文件都只会发生在容器层中。只有容器层是可写的，容器层下面的所有镜像层都是只读的。
+
+1. 添加文件：在容器中创建文件时，新文件被添加到容器层中。
+2. 读取文件：在容器中读取某个文件时，Docker 会从上往下依次在各镜像层中查找此文件。一旦找到，立即将其复制到容器层，然后打开并读入内存。
+3. 修改文件：在容器中修改已存在的文件时，Docker 会从上往下依次在各镜像层中查找此文件。一旦找到，立即将其复制到容器层，然后修改之。
+4. 删除文件：在容器中删除文件时，Docker 也是从上往下依次在镜像层中查找此文件。找到后，会在容器层中记录下此删除操作。
+
+![img](assets/Docker/docker-filesystems-multilayer-f7adb11e.png)
+
+### Namespace 命名空间
+
+namespace 是 Linux 内核用来隔离内核资源的方式。通过 namespace 可以让一些进程只能看到与自己相关的一部分资源，而另外一些进程也只能看到与它们自己相关的资源，这两拨进程根本就感觉不到对方的存在。具体的实现方式是把一个或多个进程的相关资源指定在同一个 namespace 中。
+
+linux 内核的 namespace 特性为我们提供的隔离能力：
+
+![img](assets/Docker/952033-20180725130447798-998138444.png)
+
+### CGroups 控制组
+
+控制组（cgroups）是 Linux 内核的一个特性，主要用来对共享资源进行隔离、限制、审计等。只有能控制分配到容器的资源，才能避免当多个容器同时运行时的对系统资源的竞争。
+
+控制组提供如下功能：
+
+- 资源限制：可以将组设置一定的内存限制。比如：设定内存使用上限后，一旦进程组使用的内存达到限额再申请内存就会触发 Out of Memary 警告
+- 优先级：通过优先级设定让一些组可以得到更多的 CPU 资源
+- 资源审计：用来统计系统实际上把多少资源用到合适的目的上，可以使用 cpuacct 子系统记录某个进程组使用的 CPU 时间
+- 隔离：为组隔离命名空间，这样使得一个组不会看到另一个组的进程、网络连接和文件系统
+- 控制：执行挂起、恢复和重启等操作
+
+### 网络模式
+
+Docker 的容器通过 Linux 的命名空间完成了与宿主机进程的网络隔离，但是 Docker 中的服务仍然需要与外界相连才能发挥作用。
+
+Docker 为我们提供了四种不同的网络模式，Host、Container、None 和 Bridge 模式。
+
+![img](assets/Docker/840264-20240507143807319-1694932328.png)
+
+**bridge 模式（默认）**
+
+我们只要安装了docker就会有一个 docker0 的网卡，使用的桥接模式。docker0 会为每一个容器分配一个新的 IP 地址并将 docker0 的 IP 地址设置为默认的网关。
+
+![image-20241118152453818](assets/Docker/image-20241118152453818.png)
+
+当我们通过 `docker exec -it container1 hostname -I` 命令查看一个默认网络模式的容器，用另一个容器去 `ping` 是可以 `ping` 通的。bridge 模式下的**容器与容器之间是可以互相ping通的**。
+
+![image-20241118153151468](assets/Docker/image-20241118153151468.png)
+
+**host 模式**
+
+告诉 Docker 不要将容器网络放到隔离的命名空间中，即不要容器化容器内的网络。此时容器使用本地主机的网络，它拥有完全的本地主机接口访问权限。
+
+**container 模式**
+
+Docker 的 container 网络模式是指新创建的容器和已经存在的一个容器共享一个Network Namespace。这意味着新创建的容器不会创建自己的网卡、配置自己的IP地址，而是和一个已存在的容器共享IP地址、端口范围等网络资源。
+
+命令：`docker run --net=container:name/id image`
+
+**none 模式**
+
+让 Docker 将新容器放到隔离的网络栈中，但是不进行网络配置。在这种模式下，容器内部没有网卡、IP地址、路由等信息。这意味着容器不能访问外部网络，也不能被外部网络访问。
+
+Libnetwork 网络驱动 - todo
+
 ## Dockerfile
+
+![img](assets/Docker/dockerfile-a7fbaae1.png)
 
 Dockerfile 是一个文本格式的配置文件，用户可以使用 Dockerfile 来快速创建自定义的镜像
 
@@ -324,8 +432,162 @@ EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "dockerfile-test-image.jar"]
 ```
 
-参考资料：
+## Docker Compose
+
+Compose 项目是 Docker 官方的开源项目，负责实现对基于 Docker 容器的多应用服务的快速编排。通过 Compose 使我们可以通过 yaml 格式文件定义一组相关联的应用容器并通过单个命令完成应用的创建和启动。
+
+Compose 的使用方式非常简单，基本上就是下面的三板斧：
+
+- 定义 Dockerfile
+- 定义 docker-compose.yml
+- 运行 docker-compose up
+
+**安装 Docker Compose**
+
+直接下载可执行文件到本地
+
+```shell
+$ sudo curl -L https://github.com/docker/compose/releases/download/v2.30.3/docker-compose-$(uname -s)-$(uname -m) -o /usr/local/bin/docker-compose
+$ sudo chmod +x /usr/local/bin/docker-compose
+```
+
+**Compose 模板文件**
+
+| 命令           | 功能                                                         |
+| -------------- | ------------------------------------------------------------ |
+| container_name | 指定容器名称                                                 |
+| image          | 指定镜像名称或ID                                             |
+| ports          | 暴露端口                                                     |
+| volumes        | 挂载数据卷                                                   |
+| environment    | 设置环境变量                                                 |
+| networks       | 加入网络                                                     |
+| depends_on     | 指定多个服务之间的依赖关系，会先启动被依赖的服务             |
+| healthcheck    | 健康检测机制<br />![](assets/Docker/image-20241127103505855.png) |
+
+<center>Compose 模板文件主要命令</center>
+
+example
+
+```yaml
+version: '3.8'
+services:
+  mysql:
+    container_name: gogs-mysql
+    image: mysql:8.0.25
+    environment:
+      - MYSQL_ROOT_PASSWORD=123456
+    ports:
+      - "3308:3306"
+```
+
+## Docker Swarm
+
+Docker Swarm 提供容器集群服务，是 Docker 官方对容器云生态进行支持的核心方案。作为容器集群管理器，Swarm 最大的优势之一就是原生支持 Docker API，各种基于标准 API 的工具都可以很容易的与 Swarm 集成。
+
+**基本概念**
+
+- Swarm 集群
+- 节点
+- 服务
+- 任务
+
+**创建 Swarm 集群**
+
+1. 创建集群
+
+   在管理节点上执行如下命令来创建一个新的 Swarm 集群，创建成功后会提示加入工作节点的命令，其中，返回的 token 串时集群的唯一 id，加入集群的每个节点都需要这个信息。如果在执行初始化集群命令后忘记，也可以执行 `docker swarm join-token worker` 命令再次查询。
+
+   ```shell
+   $ docker swarm init --advertise-addr {manager ip}
+   Swarm initialized: current node (fbvs8l8lgp359vjodesipz3bv) is now a manager.
+   
+   To add a worker to this swarm, run the following command:
+   
+       docker swarm join --token SWMTKN-1-39awzfrf9c54ct8s76gq9eqs4yw6wjligb0swomt1zyqt48vmi-6xx9o482nmzg5t5lxql2ckhlt {manager ip}:2377
+   
+   To add a manager to this swarm, run 'docker swarm join-token manager' and follow the instructions.
+   ```
+
+   PS：默认的管理服务端口为 2377，工作节点加入集群需要访问该端口，防火墙需要放开访问权限
+
+   ubuntu ufw 防火墙开放 2377 端口：`sudo ufw allow 2377`
+
+   查询防火墙开放端口状态：`sudo ufw status`
+
+   最后需要重启防火墙：`sudo ufw reload`
+
+2. 查看集群
+
+   通过 docker info 命令查看集群信息
+
+   ```shell
+   $ docker info
+   ...
+    Swarm: active
+     NodeID: fbvs8l8lgp359vjodesipz3bv
+     Is Manager: true
+     ClusterID: mxnzix0847z677qp9wr7dmnhx
+     Managers: 1
+     Nodes: 2
+     Default Address Pool: 10.0.0.0/8
+     SubnetSize: 24
+     Data Path Port: 4789
+     Orchestration:
+      Task History Retention Limit: 5
+     Raft:
+      Snapshot Interval: 10000
+      Number of Old Snapshots to Retain: 0
+      Heartbeat Tick: 1
+      Election Tick: 10
+     Dispatcher:
+      Heartbeat Period: 5 seconds
+     CA Configuration:
+      Expiry Duration: 3 months
+      Force Rotate: 0
+     Autolock Managers: false
+     Root Rotation In Progress: false
+     Node Address: 10.0.0.202
+     Manager Addresses:
+      10.0.0.202:2377
+   ...
+   ```
+
+   查询集群节点情况
+
+   ```shell
+   $ docker node ls
+   ID                            HOSTNAME     STATUS    AVAILABILITY   MANAGER STATUS   ENGINE VERSION
+   fbvs8l8lgp359vjodesipz3bv *   10.0.0.202   Ready     Active         Leader           27.3.1
+   ```
+
+3. 加入集群
+
+   使用初始化 Swarm 时返回的 join 命令以 worker 节点加入集群
+
+   ```shell
+   # docker swarm join --token SWMTKN-1-39awzfrf9c54ct8s76gq9eqs4yw6wjligb0swomt1zyqt48vmi-6xx9o482nmzg5t5lxql2ckhlt 10.0.0.202:2377
+   This node joined a swarm as a worker.
+   ```
+
+   如果需要以 manager 节点的形式加入集群，可以调用 `docker swarm join-token manager` 命令得到 join 命令
+
+**集群服务命令**
+
+| 命令    | 说明         | 命令     | 说明               |
+| ------- | ------------ | -------- | ------------------ |
+| create  | 创建应用     | rm       | 删除服务           |
+| inspect | 查看详细信息 | rollback | 回滚服务           |
+| logs    | 查看应用日志 | scale    | 对服务进行横向扩展 |
+| ls      | 列出服务信息 | update   | 更新服务           |
+| ps      | 列出任务信息 |          |                    |
+
+## 参考资料
 
 [1]:《Docker技术入门与实践第3版》
-[2]:https://zhuanlan.zhihu.com/p/102794942	"使用Dockerfile为SpringBoot应用构建Docker镜像"
+[2]:https://www.cnblogs.com/sparkdev/p/8998546.html	"Docker 生态概览"
+[3]:https://zhuanlan.zhihu.com/p/490585683	"Docker，containerd，CRI，CRI-O，OCI，runc 分不清？看这一篇就够了"
 
+[4]:https://www.thebyte.com.cn/container/unionfs.html	"UnionFs 联合文件系统"
+[5]:https://www.cnblogs.com/handwrit2000/p/12871493.html	"docker 镜像分层原理"
+[6]:https://www.cnblogs.com/xiongzaiqiren/p/18177383/docker-network	"docker网络配置"
+[7]:https://zhuanlan.zhihu.com/p/102794942	"使用Dockerfile为SpringBoot应用构建Docker镜像"
