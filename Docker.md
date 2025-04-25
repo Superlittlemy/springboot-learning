@@ -230,8 +230,18 @@ windows
 **HTTP API**
 
 - 查看镜像 tags：`curl {ip}:{port}/v2/image/tags/list`
-- 查询镜像 digest_hash：`curl --header "Accept: application/vnd.docker.distribution.manifest.v2+json" -I -X GET {ip}:{port}/v2/image/manifests/{tag}`
+
+- 查询镜像 digest_hash：`curl --header "Accept: application/vnd.docker.distribution.manifest.v2+json" -I -X GET {ip}:{port}/v2/{image}/manifests/{tag}`
+
+- 查看镜像 tag：`curl {ip}:{port}/v2/ubuntu-advanced/tags/list`
+
 - 删除镜像 tag：`curl -I -X DELETE {ip}:{port}/v2/openresty/manifests/{digest_hash}`
+
+- 执行垃圾回收清理镜像文件：`docker exec -it <镜像仓库容器ID/名称> /bin/registry garbage-collect <镜像仓库配置文件>`
+
+  示例：
+
+  > docker exec -it registry /bin/registry garbage-collect /etc/docker/registry/config.yml
 
 **认证配置**
 
