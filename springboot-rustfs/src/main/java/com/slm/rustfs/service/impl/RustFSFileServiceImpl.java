@@ -9,6 +9,8 @@ import com.slm.rustfs.exception.FileException;
 import com.slm.rustfs.mapper.FileMetadataMapper;
 import com.slm.rustfs.model.AccessUrlResponse;
 import com.slm.rustfs.model.FileResponse;
+import com.slm.rustfs.model.InstantUploadRequest;
+import com.slm.rustfs.model.InstantUploadResponse;
 import com.slm.rustfs.service.FileService;
 import com.slm.rustfs.utils.RustFSUtil;
 
@@ -29,8 +31,10 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -62,6 +66,11 @@ public class RustFSFileServiceImpl extends ServiceImpl<FileMetadataMapper, FileM
      */
     private static final DateTimeFormatter DATE_PATH = DateTimeFormatter.ofPattern("yyyy/MM/dd");
 
+    /**
+     * 客户端上报 MD5 的格式白名单:只接受32位十六进制
+     */
+    private static final Pattern MD5_PATTERN = Pattern.compile("^[0-9a-fA-F]{32}$");
+
     @Autowired
     private RustFSProperties rustFSProperties;
 
@@ -73,12 +82,21 @@ public class RustFSFileServiceImpl extends ServiceImpl<FileMetadataMapper, FileM
     
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public FileResponse upload(MultipartFile file) {
+    public FileResponse upload(MultipartFile file, String clientMd5) {
         if (file == null || file.isEmpty()) {
             throw new FileException(ResultStatus.BAD_REQUEST, "文件为空");
         }
         if (file.getSize() > MAX_SIZE) {
             throw new FileException(ResultStatus.FILE_SIZE_EXCEEDED, "文件大小不能超过 20MB");
+        }
+
+        // 客户端已算出 MD5 时先判断能否闪传,命中则不落库也不写对象存储
+        if (StringUtils.hasText(clientMd5)) {
+            FileMetadata instant = matchByMd5(clientMd5, file.getSize());
+            if (instant != null) {
+                log.info("普通上传命中闪传: md5={}, objectKey={}", instant.getMd5(), instant.getObjectKey());
+                return fileConvert.toResponse(instant);
+            }
         }
 
         byte[] bytes;
@@ -119,6 +137,53 @@ public class RustFSFileServiceImpl extends ServiceImpl<FileMetadataMapper, FileM
                     .one();
             return fileConvert.toResponse(winner);
         }
+    }
+
+    @Override
+    public InstantUploadResponse instantUpload(InstantUploadRequest request) {
+        FileMetadata existing = matchByMd5(request.getMd5(), request.getFileSize());
+        if (existing == null) {
+            return InstantUploadResponse.miss();
+        }
+        log.info("闪传探测命中: md5={}, fileName={}, objectKey={}",
+            existing.getMd5(), request.getFileName(), existing.getObjectKey());
+        return InstantUploadResponse.hit(fileConvert.toResponse(existing));
+    }
+
+    /**
+     * 按 MD5 匹配历史记录
+     *
+     * @param md5 客户端上报的 MD5,大小写均可
+     * @param fileSize 客户端上报的文件大小,为 null 时只按 MD5 匹配
+     * @return 命中的历史记录,未命中返回 null
+     */
+    private FileMetadata matchByMd5(String md5, Long fileSize) {
+        String normalized = normalizeMd5(md5);
+        FileMetadata existing = this.lambdaQuery()
+            .eq(FileMetadata::getMd5, normalized)
+            .one();
+        if (existing == null) {
+            return null;
+        }
+        // 大小对不上按未命中处理:客户端可能算错了 MD5,不能让一次错误命中把别的文件返回给调用方
+        if (fileSize != null && !fileSize.equals(existing.getSizeBytes())) {
+            log.warn("闪传探测因文件大小不一致判为未命中: md5={}, 声明={}, 历史={}",
+                normalized, fileSize, existing.getSizeBytes());
+            return null;
+        }
+        return existing;
+    }
+
+    /**
+     * 校验并规范化客户端上报的 MD5
+     * <p>
+     * 统一转小写:不同客户端产出的大小写不一致,不归一会造成明明存在却漏命中。
+     */
+    private String normalizeMd5(String md5) {
+        if (!StringUtils.hasText(md5) || !MD5_PATTERN.matcher(md5.trim()).matches()) {
+            throw new FileException(ResultStatus.FILE_MD5_INVALID, "MD5 必须是 32 位十六进制字符串");
+        }
+        return md5.trim().toLowerCase(Locale.ROOT);
     }
 
     @Override

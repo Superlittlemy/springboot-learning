@@ -34,6 +34,7 @@ public enum ResultStatus {
     FILE_SIZE_EXCEEDED(3003, "文件大小超出限制", HttpStatus.PAYLOAD_TOO_LARGE),
     UPLOAD_TASK_NOT_FOUND(3004, "上传任务不存在或已完成", HttpStatus.NOT_FOUND),
     CHUNK_SIZE_INVALID(3005, "分片大小不合法", HttpStatus.BAD_REQUEST),
+    FILE_MD5_INVALID(3006, "MD5格式不合法", HttpStatus.BAD_REQUEST),
 
     // 系统
     ERROR(50000, "服务器内部错误", HttpStatus.INTERNAL_SERVER_ERROR),

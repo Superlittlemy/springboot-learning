@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>分片上传演示 | Spring Boot + RustFS</title>
+<title>闪传 + 分片上传演示 | Spring Boot + RustFS</title>
 <style>
   :root {
     --bg: #f5f6f8;
@@ -58,6 +58,12 @@
   .bar { height: 10px; background: #eceff3; border-radius: 999px; overflow: hidden; margin: 14px 0 8px; }
   .bar > i { display: block; height: 100%; width: 0; background: var(--primary); transition: width .2s; }
   .bar.done > i { background: var(--success); }
+  .bar.thin { height: 6px; margin: 0 0 6px; }
+  .bar.thin.done > i { background: var(--success); }
+  .hashinfo {
+    color: var(--muted); font-size: 12px;
+    font-family: ui-monospace, SFMono-Regular, Consolas, monospace; word-break: break-all;
+  }
   .stat { display: flex; justify-content: space-between; color: var(--muted); }
   #chunks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
   .chip {
@@ -89,7 +95,7 @@
 </head>
 <body>
 <div class="wrap">
-  <h1>分片上传演示</h1>
+  <h1>闪传 + 分片上传演示</h1>
   <div class="sub">Spring Boot + RustFS(兼容 S3 的 Multipart Upload)</div>
 
   <div class="card">
@@ -118,7 +124,11 @@
       <div id="drop">拖拽文件到此处,或<strong>点击选择文件</strong><input type="file" id="file" hidden></div>
       <div id="fileInfo"></div>
     </div>
-    <div class="hint">分片可乱序、可并发提交;服务端合并后回读对象计算整文件 MD5,用于复用既有内容去重。</div>
+    <div id="hashBox" style="display:none;margin-top:14px">
+      <div class="bar thin" id="hashBar"><i></i></div>
+      <div class="hashinfo" id="hashInfo"></div>
+    </div>
+    <div class="hint">选完文件会在浏览器本地算出整文件 MD5 并自动探测闪传;服务端已存在相同内容时直接返回,一个字节都不传。分片可乱序、可并发提交,合并后仍以服务端回读对象计算的 MD5 为准。</div>
   </div>
 
   <div class="card">
@@ -162,6 +172,7 @@
   </div>
 </div>
 
+<script src="js/md5.js"></script>
 <script>
 (function () {
   'use strict';
@@ -170,6 +181,7 @@
 
   var state = {
     file: null,
+    md5: null,
     uploadId: null,
     chunkSize: 0,
     totalChunks: 0,
@@ -179,6 +191,7 @@
     paused: false,
     aborted: false,
     running: false,
+    hashing: false,
     lastObjectKey: null
   };
 
@@ -368,12 +381,14 @@
 
   function pickFile(file) {
     state.file = file;
+    state.md5 = null;
     state.uploadId = null;
     state.uploadedBytes = 0;
     state.inflight = {};
     state.chunks = [];
     state.paused = false;
     state.aborted = false;
+    state.hashing = false;
     $('resultCard').style.display = 'none';
     $('bar').classList.remove('done');
     $('bar').firstElementChild.style.width = '0';
@@ -386,6 +401,96 @@
     setStatus('待开始');
     setButtons('ready');
     log('选择文件 ' + file.name + ' (' + humanSize(file.size) + ')');
+    startHash(file);
+  }
+
+  /* ---------- 本地 MD5 + 闪传探测 ---------- */
+
+  /* 选完文件立即在浏览器里流式算 MD5;大文件不整块进内存 */
+  function startHash(file) {
+    state.hashing = true;
+    $('hashBox').style.display = 'block';
+    $('hashBar').classList.remove('done');
+    $('hashBar').firstElementChild.style.width = '0';
+    setStatus('计算 MD5 中');
+    setButtons('hashing');
+
+    var startAt = Date.now();
+    log('开始本地计算 MD5 ' + humanSize(file.size));
+
+    Md5.of(file, {
+      sliceSize: 4 * 1024 * 1024,
+      onProgress: function (loaded, total) {
+        var percent = total ? (loaded / total) * 100 : 100;
+        $('hashBar').firstElementChild.style.width = percent.toFixed(1) + '%';
+        $('hashInfo').textContent = '计算 MD5 ' + percent.toFixed(1) + '% · '
+          + humanSize(loaded) + ' / ' + humanSize(total);
+      }
+    }).then(function (md5) {
+      // 计算期间用户又选了别的文件,丢弃这次结果
+      if (state.file !== file) { return; }
+      state.md5 = md5;
+      state.hashing = false;
+      $('hashBar').classList.add('done');
+      $('hashBar').firstElementChild.style.width = '100%';
+      $('hashInfo').textContent = 'MD5 ' + md5 + ' · 耗时 '
+        + ((Date.now() - startAt) / 1000).toFixed(1) + 's';
+      log('MD5 计算完成 ' + md5 + ' · 耗时 ' + ((Date.now() - startAt) / 1000).toFixed(1) + 's', 'ok');
+      return probeInstant();
+    }).catch(function (e) {
+      // 算 MD5 失败不应阻断上传,降级为不参与闪传
+      if (state.file !== file) { return; }
+      state.md5 = null;
+      state.hashing = false;
+      $('hashInfo').textContent = 'MD5 计算失败(' + e.message + '),本次不参与闪传';
+      log('MD5 计算失败:' + e.message + ',降级为普通上传', 'err');
+      readyToUpload();
+    });
+  }
+
+  function probeInstant() {
+    setStatus('闪传探测中');
+    return request('POST', '/file/instant-upload', {
+      md5: state.md5,
+      fileSize: state.file.size,
+      fileName: state.file.name
+    }).then(function (data) {
+      if (data.instant) {
+        showResult(data.file, 'instant');
+        setStatus('闪传完成');
+        setButtons('done');
+        log('⚡ 闪传命中,未传输任何字节 md5=' + data.file.md5, 'ok');
+        return;
+      }
+      log('闪传未命中,需要正常上传');
+      readyToUpload();
+    }).catch(function (e) {
+      log('闪传探测失败:' + e.message + ',按普通上传继续', 'err');
+      readyToUpload();
+    });
+  }
+
+  function readyToUpload() {
+    setStatus('待开始');
+    setButtons('ready');
+  }
+
+  /* mode: instant(闪传未传输字节) / deduplicated(传完后命中去重) / new(新对象入库) */
+  function showResult(file, mode) {
+    state.lastObjectKey = file.objectKey;
+    $('resultCard').style.display = '';
+    $('rName').textContent = file.originalName;
+    $('rSize').textContent = humanSize(file.sizeBytes);
+    $('rMd5').textContent = file.md5;
+    $('rKey').textContent = file.objectKey;
+    $('rDedup').innerHTML = mode === 'instant'
+      ? '<span class="badge hit">⚡ 闪传成功,未传输任何字节</span>'
+      : (mode === 'deduplicated'
+        ? '<span class="badge hit">命中内容去重,复用已有对象</span>'
+        : '<span class="badge miss">新对象已入库</span>');
+    $('bar').classList.add('done');
+    $('bar').firstElementChild.style.width = '100%';
+    $('percent').textContent = '100%';
   }
 
   function nextPendingIndex() {
@@ -397,6 +502,7 @@
 
   function start() {
     if (!state.file) { alert('请先选择文件'); return; }
+    if (state.hashing) { alert('MD5 还在计算中,请稍候'); return; }
     state.paused = false;
     state.aborted = false;
 
@@ -412,7 +518,9 @@
         fileName: state.file.name,
         fileSize: state.file.size,
         contentType: state.file.type || undefined,
-        chunkSize: Number($('chunkSize').value)
+        chunkSize: Number($('chunkSize').value),
+        // 带上本地算出的 MD5,服务端若已存在相同内容会直接返回,不再建上传任务
+        md5: state.md5 || undefined
       }).then(function (data) {
         state.uploadId = data.uploadId;
         state.chunkSize = data.chunkSize;
@@ -425,6 +533,15 @@
       });
 
     init.then(function (data) {
+      // init 兜底命中闪传:此时没有任何分片被上传
+      if (data.instant) {
+        $('resumeId').value = '';
+        showResult(data.file, 'instant');
+        setStatus('闪传完成');
+        setButtons('done');
+        log('⚡ 初始化命中闪传,未传输任何字节 md5=' + data.file.md5, 'ok');
+        return;
+      }
       $('resumeId').value = data.uploadId;
       log('初始化成功 uploadId=' + data.uploadId + ' 共 ' + data.totalChunks + ' 片', 'ok');
       return runPool();
@@ -464,19 +581,8 @@
     log('调用合并接口');
     return request('POST', '/file/chunk/complete?uploadId=' + encodeURIComponent(state.uploadId))
       .then(function (data) {
-        state.lastObjectKey = data.file.objectKey;
-        $('resultCard').style.display = '';
-        $('rName').textContent = data.file.originalName;
-        $('rSize').textContent = humanSize(data.file.sizeBytes);
-        $('rMd5').textContent = data.file.md5;
-        $('rKey').textContent = data.file.objectKey;
-        $('rDedup').innerHTML = data.deduplicated
-          ? '<span class="badge hit">命中内容去重,复用已有对象(秒传)</span>'
-          : '<span class="badge miss">新对象已入库</span>';
-        $('bar').classList.add('done');
-        $('bar').firstElementChild.style.width = '100%';
-        $('percent').textContent = '100%';
-        setStatus('上传完成');
+        showResult(data.file, data.deduplicated ? 'deduplicated' : 'new');
+        setStatus(data.deduplicated ? '合并完成(命中去重)' : '上传完成');
         setButtons('done');
         log('合并完成 md5=' + data.file.md5 + (data.deduplicated ? ' (去重命中)' : ''), 'ok');
       });
@@ -533,8 +639,9 @@
     }).catch(fail);
   });
   $('btnReset').addEventListener('click', function () {
-    state.file = null; state.uploadId = null; state.chunks = [];
+    state.file = null; state.md5 = null; state.uploadId = null; state.chunks = [];
     state.uploadedBytes = 0; state.inflight = {}; state.running = false; state.paused = false;
+    state.hashing = false;
     $('file').value = '';
     $('fileInfo').style.display = 'none';
     $('chunks').innerHTML = '';
@@ -542,6 +649,10 @@
     $('bar').firstElementChild.style.width = '0';
     $('percent').textContent = '0%';
     $('resultCard').style.display = 'none';
+    $('hashBox').style.display = 'none';
+    $('hashBar').classList.remove('done');
+    $('hashBar').firstElementChild.style.width = '0';
+    $('hashInfo').textContent = '';
     $('resumeId').value = '';
     setStatus('待开始');
     setButtons('ready');
@@ -557,7 +668,7 @@
   });
 
   setButtons('ready');
-  log('页面就绪。分片接口: /file/chunk/init、/file/chunk/part、/file/chunk/{uploadId}、/file/chunk/complete');
+  log('页面就绪。闪传探测: POST /file/instant-upload;分片接口: /file/chunk/init、/file/chunk/part、/file/chunk/{uploadId}、/file/chunk/complete');
 })();
 </script>
 </body>

@@ -35,4 +35,10 @@ public class ChunkInitRequest {
      */
     private Integer chunkSize;
 
+    /**
+     * 客户端计算出的整文件 MD5(可选);提供且服务端已存在相同内容时直接闪传,
+     * 不再创建 multipart upload 与上传任务
+     */
+    private String md5;
+
 }

@@ -9,6 +9,8 @@ import com.slm.rustfs.model.ChunkInitResponse;
 import com.slm.rustfs.model.ChunkStatusResponse;
 import com.slm.rustfs.model.ChunkUploadResponse;
 import com.slm.rustfs.model.FileResponse;
+import com.slm.rustfs.model.InstantUploadRequest;
+import com.slm.rustfs.model.InstantUploadResponse;
 import com.slm.rustfs.service.ChunkUploadService;
 import com.slm.rustfs.service.FileService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -32,10 +34,23 @@ public class FileController {
 
     /**
      * 上传文件(按内容去重)
+     *
+     * @param md5 可选的客户端 MD5(请求头 X-File-Md5);提供且命中时直接返回历史记录,不落库也不写对象存储
      */
     @PostMapping(value = "/upload", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ApiResponse<FileResponse> upload(@RequestPart("file") MultipartFile file) {
-        return ApiResponse.success(fileService.upload(file));
+    public ApiResponse<FileResponse> upload(@RequestPart("file") MultipartFile file,
+                                            @RequestHeader(value = "X-File-Md5", required = false) String md5) {
+        return ApiResponse.success(fileService.upload(file, md5));
+    }
+
+    /**
+     * 闪传探测:按客户端计算出的 MD5 判断服务端是否已存在相同内容
+     * <p>
+     * 命中即返回历史文件信息,客户端无需传输任何字节;未命中返回 instant=false,客户端走正常上传流程。
+     */
+    @PostMapping("/instant-upload")
+    public ApiResponse<InstantUploadResponse> instantUpload(@Valid @RequestBody InstantUploadRequest request) {
+        return ApiResponse.success(fileService.instantUpload(request));
     }
 
     /**

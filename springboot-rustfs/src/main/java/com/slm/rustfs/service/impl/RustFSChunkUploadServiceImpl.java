@@ -29,7 +29,10 @@ import com.slm.rustfs.model.ChunkInitRequest;
 import com.slm.rustfs.model.ChunkInitResponse;
 import com.slm.rustfs.model.ChunkStatusResponse;
 import com.slm.rustfs.model.ChunkUploadResponse;
+import com.slm.rustfs.model.InstantUploadRequest;
+import com.slm.rustfs.model.InstantUploadResponse;
 import com.slm.rustfs.service.ChunkUploadService;
+import com.slm.rustfs.service.FileService;
 import com.slm.rustfs.utils.RustFSUtil;
 
 import lombok.extern.slf4j.Slf4j;
@@ -80,6 +83,9 @@ public class RustFSChunkUploadServiceImpl extends ServiceImpl<FileUploadTaskMapp
     @Autowired
     private FileMetadataMapper fileMetadataMapper;
 
+    @Autowired
+    private FileService fileService;
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public ChunkInitResponse init(ChunkInitRequest request) {
@@ -100,6 +106,23 @@ public class RustFSChunkUploadServiceImpl extends ServiceImpl<FileUploadTaskMapp
 
         String contentType = StringUtils.hasText(request.getContentType())
             ? request.getContentType() : DEFAULT_CONTENT_TYPE;
+
+        // 客户端已算出 MD5 时先判断能否闪传;命中则不创建 multipart upload、不登记上传任务
+        if (StringUtils.hasText(request.getMd5())) {
+            InstantUploadRequest probe = new InstantUploadRequest();
+            probe.setMd5(request.getMd5());
+            probe.setFileSize(fileSize);
+            probe.setFileName(request.getFileName());
+            InstantUploadResponse instant = fileService.instantUpload(probe);
+            if (Boolean.TRUE.equals(instant.getInstant())) {
+                log.info("分片初始化命中闪传: md5={}, fileName={}", request.getMd5(), request.getFileName());
+                ChunkInitResponse hit = new ChunkInitResponse();
+                hit.setInstant(true);
+                hit.setFile(instant.getFile());
+                return hit;
+            }
+        }
+
         String objectKey = LocalDate.now().format(DATE_PATH) + "/" + UUID.randomUUID() + extractExtension(request.getFileName());
 
         String uploadId = rustFSUtil.createMultipartUpload(objectKey, contentType);
@@ -121,6 +144,7 @@ public class RustFSChunkUploadServiceImpl extends ServiceImpl<FileUploadTaskMapp
         }
 
         ChunkInitResponse response = new ChunkInitResponse();
+        response.setInstant(false);
         response.setUploadId(uploadId);
         response.setObjectKey(objectKey);
         response.setChunkSize(chunkSize);
