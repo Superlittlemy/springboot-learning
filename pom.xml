@@ -40,6 +40,7 @@
         <module>springboot-jta-atomikos</module>
         <module>springboot-tcc</module>
         <module>springboot-seata</module>
+        <module>springboot-rustfs</module>
     </modules>
 
 </project>

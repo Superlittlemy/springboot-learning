@@ -1,0 +1,40 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /storage
+spring:
+  application:
+    name: rustfs
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://localhost:3306/storage?useUnicode=true&characterEncoding=utf8&serverTimezone=Asia/Shanghai&useLegacyDatetimeCode=false
+    username: root
+    password: 123456
+    hikari:
+      maximum-pool-size: 10     # 按 CPU 核数和实例数估算，连接数 = CPU核数 × 2 + 有效磁盘数
+      minimum-idle: 10          # 建议等于 maximum-pool-size，固定连接池大小，避免频繁创建/销毁连接
+      idle-timeout: 300000      # 5 分钟，仅当 minimum-idle < maximum-pool-size 时才生效
+      max-lifetime: 900000      # 15 分钟，需 < 数据库 wait_timeout
+      connection-timeout: 30000 # 30 秒，按业务容忍度调整
+      # connection-test-query: select 1 # 一般省略，依赖 JDBC4 isValid()
+  servlet:
+    multipart:
+      enabled: true
+      max-file-size: 20MB
+      max-request-size: 22MB
+      file-size-threshold: 2MB
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: false
+  mybatis:
+    mapper-locations: classpath:mapper/*.xml
+    configuration:
+      map-underscore-to-camel-case: true
+      log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+rustfs:
+  endpoint: http://localhost:9000
+  access-key: rustfsadmin
+  secret-key: rustfsadmin
+  bucket: bucket
+  # 预签名访问地址缺省有效期(秒),客户端可用 expiresSeconds 覆盖,上限7天
+  presign-expiration-seconds: 1800
