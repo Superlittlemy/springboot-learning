@@ -143,8 +143,10 @@ public class RustFSFileServiceImpl extends ServiceImpl<FileMetadataMapper, FileM
             if (!existing.containsKey(key)) {
                 continue;
             }
+            FileMetadata fileMetadata = existing.get(key);
             AccessUrlResponse r = new AccessUrlResponse();
             r.setObjectKey(key);
+            r.setOriginalName(fileMetadata.getOriginalName());
             r.setAccessUrl(rustFSUtil.getPresignedUrl(key, expiry));
             r.setExpiresAt(expiresAt);
             result.add(r);

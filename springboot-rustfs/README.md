@@ -2,11 +2,11 @@
 
 > Spring Boot 集成 RustFS 对象存储
 
-**RustFS 简介**
+## RustFS 简介
 
 RustFS 是使用目前全球最流行的、内存安全的 Rust 语言开发的 高性能 ， 分布式对象存储软件。RustFS 同时具备简单、高效的特点，也是一种高效、开源、自由、可以进行本地私有云部署的对象存储解决方案。RustFS 100% 兼容 S3 协议，使用 Apache2 许可证发行的开源软件。RustFS 使用目前全世界最受欢迎的、内存安全的语言 Rust 语言编写。 它是由全世界优秀的工程师参与并贡献的一款对于商用友好的分布式对象存储产品，RustFS 可以平替非常多非友好开源协议的对象存储产品。
 
-**Docker Compose 安装**
+## Docker Compose 安装
 
 ```yaml
 version: "3.8"
@@ -60,7 +60,7 @@ networks:
         - subnet: 172.20.0.0/16
 ```
 
-**Spring Boot 集成**
+## Spring Boot 集成
 
 1）添加依赖
 
@@ -194,3 +194,86 @@ public class RustFSUtil {
 
 }
 ```
+
+## 分片上传
+
+大文件走服务端代理的分片上传:每个分片一次 HTTP 请求打到 Spring Boot,再由 Spring Boot 转发给 RustFS 的 Multipart Upload 接口,
+最后合并成完整对象。好处是断点续传、失败重试只针对单片,且不占用服务端磁盘与内存(内存中最多驻留一片)。
+
+1）建表
+
+先执行 [chunk-upload-schema.sql](src/main/resources/db/chunk-upload-schema.sql) 建两张表:
+
+| 表 | 说明 |
+| --- | --- |
+| `file_upload_task` | 一次分片上传对应一个任务:目标对象 Key、文件大小、分片大小、分片总数 |
+| `file_upload_part` | 分片明细:分片序号与对象存储返回的 ETag,合并时原样回传 |
+
+`file_upload_task` 记录合并后(或取消后)会被清理,`file_upload_part` 随任务物理删除。
+
+2）接口
+
+| 方法 | 路径 | 说明 |
+| --- | --- | --- |
+| POST | `/storage/file/chunk/init` | 初始化,返回 `uploadId`、分片大小、分片总数 |
+| POST | `/storage/file/chunk/part` | 上传一片,参数 `uploadId`、`partNumber`,文件字段名 `file` |
+| GET | `/storage/file/chunk/{uploadId}` | 查询进度,返回已上传的分片序号(断点续传依据) |
+| POST | `/storage/file/chunk/complete?uploadId=` | 合并分片并登记文件元数据 |
+| DELETE | `/storage/file/chunk/{uploadId}` | 取消上传,终止对象存储侧的 multipart upload 并释放已上传分片 |
+
+调用示例:
+
+```bash
+# 初始化(分片总数由服务端按文件大小与分片大小计算,不信任客户端传值)
+curl -X POST http://localhost:8080/storage/file/chunk/init \
+  -H "Content-Type: application/json" \
+  -d '{"fileName":"movie.mp4","fileSize":524288000,"contentType":"video/mp4","chunkSize":10485760}'
+
+# 上传分片(partNumber 从 1 开始,可乱序、可并发)
+curl -X POST "http://localhost:8080/storage/file/chunk/part?uploadId=$UPLOAD_ID&partNumber=1" -F "file=@part_01"
+
+# 合并
+curl -X POST "http://localhost:8080/storage/file/chunk/complete?uploadId=$UPLOAD_ID"
+```
+
+合并成功返回文件信息与去重标记:
+
+```json
+{
+  "code": 0,
+  "message": "调用成功",
+  "data": {
+    "file": { "id": 2108829885806333954, "originalName": "movie.mp4", "md5": "040b18ad...", "objectKey": "2026/10/10/xxx.mp4" },
+    "deduplicated": false
+  }
+}
+```
+
+3）演示页面
+
+项目内置一个零依赖的演示页面,启动后访问 <http://localhost:8080/storage/> 即可:
+
+- 选择或拖拽文件,设置分片大小与并发数,实时看到每一片的上传进度
+- 支持暂停 / 继续 / 取消(取消会调用 `DELETE` 真正释放对象存储侧的分片)
+- 支持断点续传:粘贴 `uploadId` 点"查询进度"即可接着传剩下的分片
+- 上传完成后展示 MD5、对象 Key 与是否命中内容去重,并可一键换预签名地址预览文件
+
+4）几个设计取舍
+
+**MD5 在合并后回读计算**。普通上传(`/file/upload`)是整块进内存算 MD5;分片上传的各片是彼此独立的 HTTP 请求,
+MD5 的中间状态无法在请求之间延续(摘要状态不可序列化),所以合并完成后从对象存储流式回读一次对象计算 MD5。
+读取发生在服务端与对象存储之间,不占用外部带宽;代价是合并时多一次顺序读。
+如果不想付这个代价,可以让前端计算整文件 MD5 在 `init` 时一并传上来(业界通行做法),代价是前端要引入 MD5 库。
+
+**分片可乱序、可并发**。分片之间没有依赖关系,同序号的分片重复上传视为重传(对象存储侧同序号分片会被覆盖),因此网络重试是安全的。
+
+**分片大小限制 5MB ~ 20MB**。下限来自 S3 的硬性要求(除最后一片外分片不得小于 5MB),
+上限与 `spring.servlet.multipart.max-file-size` 对齐,分片总数上限 10000,文件总大小上限 5GB。
+
+**内容去重与普通上传共用一套**。合并后按 MD5 查 `file_metadata`,命中则删掉本次合并出的对象,直接复用历史记录(等价于"秒传"),
+响应里 `deduplicated` 为 `true`;未命中则插入新元数据。这样两条上传链路产出的记录对 `/file/access-url` 完全等价。
+
+**任务与分片明细会被清理**。合并成功或取消后,任务与分片记录一并删除。生产环境还需要补一个定时任务,
+扫描超过一定时间(比如 24 小时)仍未合并的 `file_upload_task`,调用 `abort` 接口回收对象存储侧残留的分片,
+否则客户端异常退出后分片会一直占用存储空间。
+

@@ -1,0 +1,564 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>分片上传演示 | Spring Boot + RustFS</title>
+<style>
+  :root {
+    --bg: #f5f6f8;
+    --card: #ffffff;
+    --line: #e3e6ea;
+    --text: #1f2329;
+    --muted: #8a929e;
+    --primary: #2f6feb;
+    --success: #17a673;
+    --warn: #d97706;
+    --danger: #d64545;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 32px 16px 64px;
+    background: var(--bg); color: var(--text);
+    font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", "Microsoft YaHei", sans-serif;
+  }
+  .wrap { max-width: 880px; margin: 0 auto; }
+  h1 { font-size: 22px; margin: 0 0 4px; }
+  .sub { color: var(--muted); margin-bottom: 24px; }
+  .card {
+    background: var(--card); border: 1px solid var(--line); border-radius: 10px;
+    padding: 20px; margin-bottom: 16px;
+  }
+  .card h2 { font-size: 15px; margin: 0 0 16px; display: flex; align-items: center; gap: 8px; }
+  .card h2::before { content: ''; width: 3px; height: 14px; background: var(--primary); border-radius: 2px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .row + .row { margin-top: 14px; }
+  label.field { display: flex; align-items: center; gap: 8px; color: var(--muted); }
+  input[type=text], input[type=number], select {
+    border: 1px solid var(--line); border-radius: 6px; padding: 7px 10px;
+    font: inherit; color: var(--text); background: #fff;
+  }
+  input[type=text]:focus, select:focus { outline: none; border-color: var(--primary); }
+  button {
+    border: 1px solid var(--line); background: #fff; color: var(--text);
+    border-radius: 6px; padding: 8px 16px; font: inherit; cursor: pointer;
+  }
+  button:hover:not(:disabled) { border-color: var(--primary); color: var(--primary); }
+  button:disabled { opacity: .45; cursor: not-allowed; }
+  button.primary { background: var(--primary); border-color: var(--primary); color: #fff; }
+  button.primary:hover:not(:disabled) { background: #2559c4; color: #fff; }
+  button.danger:hover:not(:disabled) { border-color: var(--danger); color: var(--danger); }
+  #drop {
+    border: 1px dashed #c3c9d1; border-radius: 10px; padding: 32px; text-align: center;
+    color: var(--muted); cursor: pointer; transition: .15s;
+  }
+  #drop:hover, #drop.over { border-color: var(--primary); background: #f5f9ff; color: var(--primary); }
+  #drop strong { color: var(--text); }
+  #fileInfo { margin-top: 12px; color: var(--muted); display: none; }
+  .bar { height: 10px; background: #eceff3; border-radius: 999px; overflow: hidden; margin: 14px 0 8px; }
+  .bar > i { display: block; height: 100%; width: 0; background: var(--primary); transition: width .2s; }
+  .bar.done > i { background: var(--success); }
+  .stat { display: flex; justify-content: space-between; color: var(--muted); }
+  #chunks { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 16px; }
+  .chip {
+    min-width: 42px; text-align: center; padding: 5px 8px; border-radius: 5px;
+    background: #eceff3; color: var(--muted); font-size: 12px;
+  }
+  .chip.active { background: #dbe8ff; color: var(--primary); }
+  .chip.done { background: #dcf3ea; color: var(--success); }
+  .chip.skip { background: #fdf0d8; color: var(--warn); }
+  .badge {
+    display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 12px;
+    background: #eef1f5; color: var(--muted);
+  }
+  .badge.hit { background: #dcf3ea; color: var(--success); }
+  .badge.miss { background: #e6efff; color: var(--primary); }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 6px 0; vertical-align: top; }
+  td:first-child { width: 96px; color: var(--muted); }
+  td.mono { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; word-break: break-all; }
+  #log {
+    height: 180px; overflow: auto; background: #1f2329; color: #c8d0da;
+    border-radius: 8px; padding: 12px; font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+    font-size: 12px; line-height: 1.7;
+  }
+  #log .ok { color: #6fd3a3; }
+  #log .err { color: #f08a8a; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 10px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>分片上传演示</h1>
+  <div class="sub">Spring Boot + RustFS(兼容 S3 的 Multipart Upload)</div>
+
+  <div class="card">
+    <h2>1. 选择文件</h2>
+    <div class="row">
+      <label class="field">接口前缀
+        <input type="text" id="base" value="" placeholder="留空表示与页面同源" style="width:220px">
+      </label>
+      <label class="field">分片大小
+        <select id="chunkSize">
+          <option value="5242880" selected>5 MB</option>
+          <option value="10485760">10 MB</option>
+          <option value="20971520">20 MB</option>
+        </select>
+      </label>
+      <label class="field">并发数
+        <select id="concurrency">
+          <option value="1" selected>1</option>
+          <option value="2">2</option>
+          <option value="3">3</option>
+          <option value="5">5</option>
+        </select>
+      </label>
+    </div>
+    <div class="row">
+      <div id="drop">拖拽文件到此处,或<strong>点击选择文件</strong><input type="file" id="file" hidden></div>
+      <div id="fileInfo"></div>
+    </div>
+    <div class="hint">分片可乱序、可并发提交;服务端合并后回读对象计算整文件 MD5,用于复用既有内容去重。</div>
+  </div>
+
+  <div class="card">
+    <h2>2. 上传进度</h2>
+    <div class="bar" id="bar"><i></i></div>
+    <div class="stat">
+      <span id="status">待开始</span>
+      <span id="percent">0%</span>
+    </div>
+    <div id="chunks"></div>
+    <div class="row" style="margin-top:18px">
+      <button class="primary" id="btnStart" disabled>开始上传</button>
+      <button id="btnPause" disabled>暂停</button>
+      <button id="btnResume" disabled>继续</button>
+      <button id="btnAbort" disabled>取消并释放分片</button>
+      <button id="btnReset">重置</button>
+    </div>
+    <div class="row">
+      <label class="field">断点续传:uploadId
+        <input type="text" id="resumeId" placeholder="粘贴 uploadId 可接着传" style="width:320px">
+      </label>
+      <button id="btnQuery">查询进度</button>
+    </div>
+  </div>
+
+  <div class="card" id="resultCard" style="display:none">
+    <h2>3. 上传结果</h2>
+    <table>
+      <tr><td>文件名</td><td id="rName"></td></tr>
+      <tr><td>大小</td><td id="rSize"></td></tr>
+      <tr><td>MD5</td><td class="mono" id="rMd5"></td></tr>
+      <tr><td>对象 Key</td><td class="mono" id="rKey"></td></tr>
+      <tr><td>去重</td><td id="rDedup"></td></tr>
+      <tr><td>操作</td><td><button id="btnPreview">获取预签名地址并预览</button></td></tr>
+    </table>
+  </div>
+
+  <div class="card">
+    <h2>接口日志</h2>
+    <div id="log"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  var CHUNK_STATE = { PENDING: 0, ACTIVE: 1, DONE: 2, SKIP: 3 };
+
+  var state = {
+    file: null,
+    uploadId: null,
+    chunkSize: 0,
+    totalChunks: 0,
+    uploadedBytes: 0,
+    inflight: {},
+    chunks: [],
+    paused: false,
+    aborted: false,
+    running: false,
+    lastObjectKey: null
+  };
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  function log(message, type) {
+    var el = document.createElement('div');
+    if (type) { el.className = type; }
+    var now = new Date();
+    var time = [now.getHours(), now.getMinutes(), now.getSeconds()]
+      .map(function (n) { return String(n).padStart(2, '0'); }).join(':');
+    el.textContent = '[' + time + '] ' + message;
+    $('log').appendChild(el);
+    $('log').scrollTop = $('log').scrollHeight;
+  }
+
+  function humanSize(bytes) {
+    if (!bytes) { return '0 B'; }
+    var units = ['B', 'KB', 'MB', 'GB', 'TB'], i = 0, value = bytes;
+    while (value >= 1024 && i < units.length - 1) { value /= 1024; i++; }
+    return value.toFixed(i === 0 ? 0 : 2) + ' ' + units[i];
+  }
+
+  /* 接口前缀留空时按相对路径解析,自动带上 context-path(如 /storage/);
+     填写绝对地址(如 http://host/storage 或 /storage)时按前缀拼接 */
+  function api(path) {
+    var prefix = ($('base').value || '').trim().replace(/\/$/, '');
+    return prefix ? prefix + path : path.replace(/^\//, '');
+  }
+
+  function parseBody(xhr) {
+    try { return JSON.parse(xhr.responseText); } catch (e) { return null; }
+  }
+
+  /* 普通 JSON 请求 */
+  function request(method, path, body) {
+    return fetch(api(path), {
+      method: method,
+      headers: body ? { 'Content-Type': 'application/json' } : undefined,
+      body: body ? JSON.stringify(body) : undefined
+    }).then(function (res) {
+      return res.json().then(function (json) {
+        if (!res.ok || json.code !== 0) {
+          throw new Error(json.message || ('HTTP ' + res.status));
+        }
+        return json.data;
+      });
+    });
+  }
+
+  /* 分片上传走 XHR,才能拿到单片的实时进度 */
+  function uploadPart(partNumber, blob) {
+    return new Promise(function (resolve, reject) {
+      var form = new FormData();
+      form.append('file', blob, 'chunk-' + partNumber);
+
+      var xhr = new XMLHttpRequest();
+      xhr.open('POST', api('/file/chunk/part?uploadId=' + encodeURIComponent(state.uploadId)
+        + '&partNumber=' + partNumber));
+      xhr.upload.onprogress = function (e) {
+        if (e.lengthComputable) {
+          state.inflight[partNumber] = e.loaded;
+          renderProgress();
+        }
+      };
+      xhr.onload = function () {
+        var json = parseBody(xhr);
+        if (xhr.status >= 200 && xhr.status < 300 && json && json.code === 0) {
+          resolve(json.data);
+        } else {
+          reject(new Error((json && json.message) || ('HTTP ' + xhr.status)));
+        }
+      };
+      xhr.onerror = function () { reject(new Error('网络错误')); };
+      xhr.onabort = function () { reject(new Error('已取消')); };
+      xhr.send(form);
+    });
+  }
+
+  /* ---------- 渲染 ---------- */
+
+  function renderChunks() {
+    var box = $('chunks'), html = '';
+    for (var i = 0; i < state.chunks.length; i++) {
+      var s = state.chunks[i];
+      var cls = s === CHUNK_STATE.DONE ? 'done'
+        : s === CHUNK_STATE.ACTIVE ? 'active'
+        : s === CHUNK_STATE.SKIP ? 'skip' : '';
+      html += '<span class="chip ' + cls + '">' + (i + 1) + '</span>';
+    }
+    box.innerHTML = html;
+  }
+
+  function renderProgress() {
+    var loaded = state.uploadedBytes;
+    Object.keys(state.inflight).forEach(function (key) { loaded += state.inflight[key]; });
+    var total = state.file ? state.file.size : 0;
+    var percent = total ? Math.min(100, (loaded / total) * 100) : 0;
+    $('bar').firstElementChild.style.width = percent.toFixed(1) + '%';
+    $('percent').textContent = percent.toFixed(1) + '% · ' + humanSize(loaded) + ' / ' + humanSize(total);
+  }
+
+  function setStatus(text) { $('status').textContent = text; }
+
+  function setButtons(mode) {
+    $('btnStart').disabled = mode !== 'ready';
+    $('btnPause').disabled = mode !== 'running';
+    $('btnResume').disabled = mode !== 'paused';
+    $('btnAbort').disabled = (mode !== 'running' && mode !== 'paused');
+  }
+
+  function markDone(partNumber, size) {
+    state.chunks[partNumber - 1] = CHUNK_STATE.DONE;
+    state.uploadedBytes += size;
+    renderChunks();
+    renderProgress();
+  }
+
+  /* ---------- 并发上传 ---------- */
+
+  /* 每个 worker 循环领取一片待传分片,分片之间互不依赖,可乱序到达服务端 */
+  function worker() {
+    if (state.aborted || state.paused) { return Promise.resolve(); }
+
+    var index = nextPendingIndex();
+    if (index === -1) { return Promise.resolve(); }
+
+    var partNumber = index + 1;
+    var start = (partNumber - 1) * state.chunkSize;
+    var blob = state.file.slice(start, Math.min(start + state.chunkSize, state.file.size));
+
+    state.chunks[index] = CHUNK_STATE.ACTIVE;
+    renderChunks();
+    setStatus('上传中 ' + activeCount() + ' 个并发 · 第 ' + partNumber + '/' + state.totalChunks + ' 片');
+
+    return uploadPart(partNumber, blob).then(function (data) {
+      delete state.inflight[partNumber];
+      markDone(partNumber, data.sizeBytes);
+      return worker();
+    }).catch(function (e) {
+      delete state.inflight[partNumber];
+      state.chunks[index] = CHUNK_STATE.PENDING;
+      renderChunks();
+      throw e;
+    });
+  }
+
+  function activeCount() {
+    return state.chunks.filter(function (s) { return s === CHUNK_STATE.ACTIVE; }).length;
+  }
+
+  function runPool() {
+    if (state.running) { return Promise.resolve(); }
+    state.running = true;
+    setButtons('running');
+
+    var concurrency = Math.max(1, Number($('concurrency').value));
+    var workers = [];
+    for (var i = 0; i < concurrency; i++) {
+      workers.push(worker());
+    }
+
+    return Promise.all(workers).then(function () {
+      if (state.aborted) { return null; }
+      if (state.paused) {
+        setStatus('已暂停');
+        setButtons('paused');
+        log('已暂停,' + doneCount() + '/' + state.totalChunks + ' 片已入库');
+        return null;
+      }
+      return complete();
+    }).catch(function (e) {
+      state.aborted = true;
+      fail(e);
+    }).then(function () {
+      state.running = false;
+    });
+  }
+
+  function doneCount() {
+    return state.chunks.filter(function (s) {
+      return s === CHUNK_STATE.DONE || s === CHUNK_STATE.SKIP;
+    }).length;
+  }
+
+  /* ---------- 流程 ---------- */
+
+  function pickFile(file) {
+    state.file = file;
+    state.uploadId = null;
+    state.uploadedBytes = 0;
+    state.inflight = {};
+    state.chunks = [];
+    state.paused = false;
+    state.aborted = false;
+    $('resultCard').style.display = 'none';
+    $('bar').classList.remove('done');
+    $('bar').firstElementChild.style.width = '0';
+    $('percent').textContent = '0%';
+    $('chunks').innerHTML = '';
+    $('fileInfo').style.display = 'block';
+    $('fileInfo').innerHTML = '已选择 <strong>' + escapeHtml(file.name) + '</strong> · '
+      + humanSize(file.size) + ' · 分片 ' + humanSize($('chunkSize').value) + ' · 共 '
+      + Math.ceil(file.size / Number($('chunkSize').value)) + ' 片';
+    setStatus('待开始');
+    setButtons('ready');
+    log('选择文件 ' + file.name + ' (' + humanSize(file.size) + ')');
+  }
+
+  function nextPendingIndex() {
+    for (var i = 0; i < state.chunks.length; i++) {
+      if (state.chunks[i] === CHUNK_STATE.PENDING) { return i; }
+    }
+    return -1;
+  }
+
+  function start() {
+    if (!state.file) { alert('请先选择文件'); return; }
+    state.paused = false;
+    state.aborted = false;
+
+    // 手动粘贴 uploadId 续传时,本地没有分片规划,先向服务端要一次进度
+    if (state.uploadId && !state.totalChunks) {
+      queryStatus(true);
+      return;
+    }
+
+    var init = state.uploadId
+      ? Promise.resolve({ uploadId: state.uploadId, chunkSize: state.chunkSize, totalChunks: state.totalChunks })
+      : request('POST', '/file/chunk/init', {
+        fileName: state.file.name,
+        fileSize: state.file.size,
+        contentType: state.file.type || undefined,
+        chunkSize: Number($('chunkSize').value)
+      }).then(function (data) {
+        state.uploadId = data.uploadId;
+        state.chunkSize = data.chunkSize;
+        state.totalChunks = data.totalChunks;
+        state.chunks = new Array(state.totalChunks).fill(CHUNK_STATE.PENDING);
+        state.uploadedBytes = 0;
+        renderChunks();
+        renderProgress();
+        return data;
+      });
+
+    init.then(function (data) {
+      $('resumeId').value = data.uploadId;
+      log('初始化成功 uploadId=' + data.uploadId + ' 共 ' + data.totalChunks + ' 片', 'ok');
+      return runPool();
+    }).catch(function (e) {
+      fail(e);
+    });
+  }
+
+  /* 断点续传:按 uploadId 拉取服务端进度,补齐分片视图 */
+  function queryStatus(thenStart) {
+    var uploadId = $('resumeId').value.trim();
+    if (!uploadId) { alert('请输入 uploadId'); return; }
+    request('GET', '/file/chunk/' + encodeURIComponent(uploadId)).then(function (data) {
+      state.uploadId = data.uploadId;
+      state.chunkSize = data.chunkSize;
+      state.totalChunks = data.totalChunks;
+      state.chunks = new Array(data.totalChunks).fill(CHUNK_STATE.PENDING);
+      var uploaded = 0;
+      data.uploadedPartNumbers.forEach(function (n) {
+        state.chunks[n - 1] = CHUNK_STATE.SKIP;
+        uploaded += (n === data.totalChunks)
+          ? data.totalSize - data.chunkSize * (n - 1)
+          : data.chunkSize;
+      });
+      state.uploadedBytes = uploaded;
+      renderChunks();
+      renderProgress();
+      setStatus('已恢复进度 ' + data.uploadedChunks + '/' + data.totalChunks);
+      setButtons('ready');
+      log('查询进度成功:' + data.uploadedChunks + '/' + data.totalChunks + ' 片', 'ok');
+      if (thenStart) { start(); }
+    }).catch(function (e) { fail(e); });
+  }
+
+  function complete() {
+    setStatus('合并分片中');
+    log('调用合并接口');
+    return request('POST', '/file/chunk/complete?uploadId=' + encodeURIComponent(state.uploadId))
+      .then(function (data) {
+        state.lastObjectKey = data.file.objectKey;
+        $('resultCard').style.display = '';
+        $('rName').textContent = data.file.originalName;
+        $('rSize').textContent = humanSize(data.file.sizeBytes);
+        $('rMd5').textContent = data.file.md5;
+        $('rKey').textContent = data.file.objectKey;
+        $('rDedup').innerHTML = data.deduplicated
+          ? '<span class="badge hit">命中内容去重,复用已有对象(秒传)</span>'
+          : '<span class="badge miss">新对象已入库</span>';
+        $('bar').classList.add('done');
+        $('bar').firstElementChild.style.width = '100%';
+        $('percent').textContent = '100%';
+        setStatus('上传完成');
+        setButtons('done');
+        log('合并完成 md5=' + data.file.md5 + (data.deduplicated ? ' (去重命中)' : ''), 'ok');
+      });
+  }
+
+  function fail(e) {
+    state.running = false;
+    setStatus('已中断:' + e.message);
+    setButtons(state.uploadId ? 'paused' : 'ready');
+    log(e.message, 'err');
+  }
+
+  function escapeHtml(text) {
+    return String(text).replace(/[&<>"]/g, function (c) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c];
+    });
+  }
+
+  /* ---------- 事件绑定 ---------- */
+
+  $('drop').addEventListener('click', function () { $('file').click(); });
+  $('drop').addEventListener('dragover', function (e) {
+    e.preventDefault(); $('drop').classList.add('over');
+  });
+  $('drop').addEventListener('dragleave', function () { $('drop').classList.remove('over'); });
+  $('drop').addEventListener('drop', function (e) {
+    e.preventDefault();
+    $('drop').classList.remove('over');
+    if (e.dataTransfer.files.length) { pickFile(e.dataTransfer.files[0]); }
+  });
+  $('file').addEventListener('change', function (e) {
+    if (e.target.files.length) { pickFile(e.target.files[0]); }
+  });
+
+  $('btnStart').addEventListener('click', start);
+  $('btnPause').addEventListener('click', function () {
+    state.paused = true;
+    setButtons('paused');
+    setStatus('暂停中(当前片传完后生效)');
+  });
+  $('btnResume').addEventListener('click', function () {
+    state.paused = false;
+    state.aborted = false;
+    runPool();
+  });
+  $('btnAbort').addEventListener('click', function () {
+    if (!state.uploadId) { return; }
+    state.aborted = true;
+    state.paused = false;
+    request('DELETE', '/file/chunk/' + encodeURIComponent(state.uploadId)).then(function () {
+      log('已取消并释放服务端分片', 'ok');
+      setStatus('已取消');
+      setButtons('ready');
+    }).catch(fail);
+  });
+  $('btnReset').addEventListener('click', function () {
+    state.file = null; state.uploadId = null; state.chunks = [];
+    state.uploadedBytes = 0; state.inflight = {}; state.running = false; state.paused = false;
+    $('file').value = '';
+    $('fileInfo').style.display = 'none';
+    $('chunks').innerHTML = '';
+    $('bar').classList.remove('done');
+    $('bar').firstElementChild.style.width = '0';
+    $('percent').textContent = '0%';
+    $('resultCard').style.display = 'none';
+    $('resumeId').value = '';
+    setStatus('待开始');
+    setButtons('ready');
+  });
+  $('btnQuery').addEventListener('click', function () { queryStatus(false); });
+
+  $('btnPreview').addEventListener('click', function () {
+    request('POST', '/file/access-url', { objectKeys: [state.lastObjectKey] }).then(function (list) {
+      if (!list.length) { alert('未找到该对象的访问地址'); return; }
+      window.open(list[0].accessUrl, '_blank');
+      log('已获取预签名地址(有效期至 ' + list[0].expiresAt + ')');
+    }).catch(function (e) { log(e.message, 'err'); });
+  });
+
+  setButtons('ready');
+  log('页面就绪。分片接口: /file/chunk/init、/file/chunk/part、/file/chunk/{uploadId}、/file/chunk/complete');
+})();
+</script>
+</body>
+</html>

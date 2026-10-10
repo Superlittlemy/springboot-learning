@@ -13,6 +13,9 @@ public class AccessUrlResponse {
     /** 对象Key */
     private String objectKey;
 
+    /** 原始文件名 */
+    private String originalName;
+
     /** 带过期时间的访问地址(GET预签名URL) */
     private String accessUrl;
 
