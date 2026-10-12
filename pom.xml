@@ -41,6 +41,7 @@
         <module>springboot-tcc</module>
         <module>springboot-seata</module>
         <module>springboot-rustfs</module>
+        <module>springboot-multi-level-cache</module>
     </modules>
 
 </project>

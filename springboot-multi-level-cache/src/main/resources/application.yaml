@@ -1,0 +1,52 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /cache
+
+spring:
+  application:
+    name: multi-level-cache
+  redis:
+    host: localhost
+    port: 6379
+    database: 0
+    password: redis123456
+    timeout: 3000ms
+    lettuce:
+      pool:
+        max-active: 32
+        max-idle: 16
+        min-idle: 4
+        max-wait: 2000ms
+  jackson:
+    deserialization:
+      fail-on-unknown-properties: false
+
+# 多级缓存配置
+multi-level-cache:
+  # L1 本地缓存：必须短于 L2，广播丢失时靠 TTL 自愈
+  local-ttl: 1m
+  local-maximum-size: 10000
+  # L2 分布式缓存：跨节点共享，可以放久一些
+  remote-ttl: 30m
+  # L2 过期时间抖动，打散到期时刻防雪崩
+  remote-ttl-jitter: 0.1
+  # 防穿透：缓存空值标记
+  cache-null-value: true
+  null-value-ttl: 1m
+  # L1 失效广播频道
+  invalidate-channel: multi-level-cache:invalidate
+  # 是否订阅失效广播：单节点部署可关闭以省掉一个 Redis 长连接
+  broadcast-enabled: true
+  # 防击穿：重建互斥锁
+  lock-key-prefix: "multi-level-cache:lock:"
+  rebuild-lock-ttl: 5s
+  # 延迟双删：兜住「删缓存后、并发读把旧值写回」的竞态
+  delayed-double-delete-enabled: true
+  double-delete-delay: 1s
+  # 一致性对账周期：兜底修复丢失的失效广播
+  reconcile-interval-millis: 60000
+
+logging:
+  level:
+    com.slm.multilevelcache: DEBUG

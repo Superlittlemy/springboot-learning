@@ -1,0 +1,89 @@
+version: "3.8"
+
+services:
+  # L0：接入层缓存
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: cache-nginx
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - nginx-cache:/var/cache/nginx
+      - nginx-logs:/var/log/nginx
+    depends_on:
+      - cache-app-1
+      - cache-app-2
+    networks:
+      - cache-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  # L2：分布式缓存
+  redis:
+    image: redis:7-alpine
+    container_name: cache-redis
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --maxmemory 512mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    networks:
+      - cache-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # 应用节点 1
+  cache-app-1:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: cache-app-1
+    environment:
+      SPRING_REDIS_HOST: redis
+      # 节点标识会写进失效广播消息，方便排查是谁触发的失效
+      NODE_ID: cache-app-1
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      cache-network
+    restart: unless-stopped
+
+  # 应用节点 2
+  # L1(Caffeine) 是每个节点私有的，两个节点的存在才能演示广播失效：
+  # 在 1 号节点更新数据后，2 号节点的 L1 必须靠广播被清理掉
+  cache-app-2:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: cache-app-2
+    environment:
+      SPRING_REDIS_HOST: redis
+      NODE_ID: cache-app-2
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      cache-network
+    restart: unless-stopped
+
+volumes:
+  nginx-cache:
+  nginx-logs:
+  redis-data:
+
+networks:
+  cache-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.31.0.0/16
