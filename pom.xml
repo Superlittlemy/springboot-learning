@@ -42,6 +42,7 @@
         <module>springboot-seata</module>
         <module>springboot-rustfs</module>
         <module>springboot-multi-level-cache</module>
+        <module>springboot-rocketmq</module>
     </modules>
 
 </project>

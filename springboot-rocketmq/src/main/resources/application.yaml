@@ -1,0 +1,13 @@
+server:
+  servlet:
+    port: 8080
+    context-path: /rocketmq
+spring:
+  application:
+    name: rocketmq
+rocketmq:
+  name-server: 127.0.0.1:9876  # NameServer 地址
+  producer:
+    group: default-producer-group   # 生产者组名，必须唯一
+    send-message-timeout: 3000
+    retry-times-when-send-failed: 2

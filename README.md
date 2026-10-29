@@ -44,6 +44,7 @@ Spring Boot 是用来快速开发 Spring 应用的脚手架，其设计目的就
 - Spring Boot TCC 柔性事务实现
 - Spring Boot 集成 Seata 分布式事务解决方案
 - Spring Boot 集成 RustFS 对象存储
+- Spring Boot 集成 RocketMQ 消息队列
 
 辅助功能
 
